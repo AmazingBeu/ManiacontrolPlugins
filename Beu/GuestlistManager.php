@@ -21,7 +21,7 @@ class GuestlistManager implements CommandListener, Plugin {
 	/*
 	 * Constants
 	 */
-	const PLUGIN_ID			= 199;
+	const PLUGIN_ID			= 154;
 	const PLUGIN_VERSION	= 1.0;
 	const PLUGIN_NAME		= 'Guestlist Manager';
 	const PLUGIN_AUTHOR		= 'Beu';
