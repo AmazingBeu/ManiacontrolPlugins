@@ -39,7 +39,7 @@ use Maniaplanet\DedicatedServer\InvalidArgumentException;
 class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 1.0;
+	const PLUGIN_VERSION									= 1.1;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -396,7 +396,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_CUSTOM_GAMEMODE, "", "Load custom gamemode script (some functions can bug, for expert only)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_AFTERMATCH, array("TimeAttack"), "Gamemode to launch after the match");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Champion", "Cup", "Knockout",  "Laps", "Teams", "TimeAttack", "Rounds"), "Gamemode to launch for the match");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_LOAD_MAPLIST_FILE, true, "Load Maps + Matchsettings from the file (or use the current maplist on the server)");
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_LOAD_MAPLIST_FILE, false, "Load Maps + Matchsettings from the file (or use the current maplist on the server)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_MAPLIST, "match.txt", "Maps + Matchsettings file to load (empty to use server login)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_MATCHSETTINGS_CONF, false, "Load configuration from matchsettings file instead of Admin Interface (can be usefull with a custom script)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_DURATION, 120, "Default Pause Duration in seconds");
@@ -711,6 +711,11 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 				$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $maplist;
 			}
 			Logger::log("Load matchsettings: " . $maplist);
+			if (!is_file($this->maniaControl->getServer()->getDirectory()->getMapsFolder() . $maplist)) {
+				Logger::log("The Maplist file is not accessible or does not exist (the match has not started)");
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "The Maplist file is not accessible or does not exist (the match has not started)");
+				return;
+			}
 			$this->maniaControl->getClient()->loadMatchSettings($maplist);
 			Logger::log("Restructure maplist");
 			$this->maniaControl->getMapManager()->restructureMapList();
@@ -719,7 +724,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'FYI, No Settings will be load, check "' . self::SETTING_MATCH_MATCHSETTINGS_CONF . "\" and \"" . self::SETTING_MATCH_MAPLIST . "\"");
 			}
 		}
-		
+
 		Logger::log("Load Script");
 		$this->maniaControl->getClient()->setScriptName($scriptName);
 
@@ -1156,15 +1161,17 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 					Logger::log("Map: " . $this->nbmaps);
 
 					$maps = $this->maniaControl->getMapManager()->getMaps();
-					$i    = 1;
+					$nbmaps = $this->maniaControl->getMapManager()->getMapsCount();
+					
+					$i = 1;
 					$this->currentmap = $this->maniaControl->getMapManager()->getCurrentMap();
-					$message =  $this->chatprefix . '$o$iCurrent Map:' . "\n";
-					$message .= '$o$i' . Formatter::stripCodes($this->currentmap->name);
+					$message =  $this->chatprefix . '$<$o$iCurrent Map:$>' . "\n";
+					$message .=  Formatter::stripCodes($this->currentmap->name);
 					$this->maniaControl->getChat()->sendInformation($message);
 					Logger::log("Current Map: " . Formatter::stripCodes($this->currentmap->name));
 					$continue = false;
 					$current  = false;
-					$message =  $this->chatprefix . '$o$iNext Maps:'; //TODO remove Next map if no next map
+					$message = "";
 					foreach ($maps as $map) { //TODO check no nextmap in cup mode
 						if ($this->currentmap->uid == $map->uid) {
 							$continue = true;
@@ -1174,19 +1181,24 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 							if ($current) {
 								$current = false;
 							} elseif (($this->nbmaps + $i) <= ($this->settings_nbmapsbymatch)) {
+								Logger::log("i: " . $i);
 								if ($i > 0) {
+									if ($i == 1) {
+										$message =  $this->chatprefix . '$<$o$iNext Maps:$>';
+									}
 									Logger::log("Map " . $i . ": " . Formatter::stripCodes($map->name));
-									$message .= "\n" . '$o$i' . $i . ": " . Formatter::stripCodes($map->name);
-								}
-								$nbmaps = $this->maniaControl->getMapManager()->getMapsCount();
-								$i++;
-								if ($this->nbmaps == ($nbmaps - ($i - 1) + 1) or $this->settings_nbmapsbymatch == (($i - 1) + $this->nbmaps - 1)) {
-									$continue = false;
+									$message .= "\n" . $i . ": " . Formatter::stripCodes($map->name);
+									$i++;
+									if ($this->nbmaps == ($nbmaps - ($i - 1) + 1) or $this->settings_nbmapsbymatch == (($i - 1) + $this->nbmaps - 1)) {
+										$continue = false;
+									}
 								}
 							}
 						}
 					}
-					$this->maniaControl->getChat()->sendInformation($message);
+					if (!empty($message)) {
+						$this->maniaControl->getChat()->sendInformation($message);
+					}
 				}
 				// Trigger Callback
 				$currentstatus = [
@@ -1661,3 +1673,4 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		}
 	}
 }
+
