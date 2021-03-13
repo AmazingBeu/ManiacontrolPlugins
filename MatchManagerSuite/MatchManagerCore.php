@@ -235,7 +235,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			'default' => 6,
 			'description' => 'Number of rounds to play before finding a winner of the step' ],
 		self::SETTING_MATCH_S_ROUNDSPERMAP => [
-			'gamemode' => ['Cup', 'Knockout', 'Teams', 'Rounds'],
+			'gamemode' => ['Champion', 'Cup', 'Knockout', 'Teams', 'Rounds'],
 			'type' => 'integer',
 			'default' => 5,
 			'description' => 'Number of rounds par map (0 = unlimited) (multiple maps doesn\'t work in KO)' ],
@@ -1181,7 +1181,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 							if ($current) {
 								$current = false;
 							} elseif (($this->nbmaps + $i) <= ($this->settings_nbmapsbymatch)) {
-								Logger::log("i: " . $i);
 								if ($i > 0) {
 									if ($i == 1) {
 										$message =  $this->chatprefix . '$<$o$iNext Maps:$>';
@@ -1212,7 +1211,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			Logger::log("scriptName: " . $scriptName);
 			if ($scriptName == "Trackmania/TM_TimeAttack_Online.Script.txt") {
 				$this->postmatch = false;	
-	
+
 				Logger::log("Load Script Settings");
 				$postmatchsettings = [
 					self::SETTING_MATCH_S_FORCELAPSNB => 0,
@@ -1221,14 +1220,13 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 					self::SETTING_MATCH_S_TIMELIMIT => 600
 				];
 				$this->maniaControl->getClient()->setModeScriptSettings($postmatchsettings);
-	
+
 				Logger::log("Restarting Map for load settings");
 				$this->maniaControl->getClient()->restartMap();
 			} else {
 				// Depending of the load of the server and the match gamemode, the script could be not loaded, this is a workaround to reload thhe script
 				$this->maniaControl->getClient()->restartMap();
 			}
-
 		}
 	}
 
@@ -1612,8 +1610,8 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	
 				if (isset($array[0])) {
 						$login = $array[0];
-				} elseif (strlen($peopletoadd) == 22) {
-						$login = $peopletoadd ;
+				} elseif (strlen($text[1]) == 22) {
+						$login = $text[1] ;
 				}
 				if ($mysqli->error) {
 						trigger_error($mysqli->error, E_USER_ERROR);
@@ -1625,7 +1623,8 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 						$this->maniaControl->getModeScriptEventManager()->setTrackmaniaPlayerPoints($player, "", "", $text[2]);
 						$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> now has ' . $text[2] . ' points!');
 					} else {
-						$this->maniaControl->getChat()->sendError($this->chatprefix . 'Player ' . $text[1] . " doesn't exist", $adminplayer);
+						$this->maniaControl->getModeScriptEventManager()->setTrackmaniaPlayerPoints($player, "", "", $text[2]);
+						$this->maniaControl->getChat()->sendError($this->chatprefix . 'Player ' . $text[1] . " isn't connected", $adminplayer);
 					}
 				} else {
 					$this->maniaControl->getChat()->sendError($this->chatprefix . 'Player ' . $text[1] . " doesn't exist", $adminplayer);
@@ -1673,4 +1672,3 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		}
 	}
 }
-
