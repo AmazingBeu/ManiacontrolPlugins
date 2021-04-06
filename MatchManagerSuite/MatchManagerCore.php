@@ -311,6 +311,8 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	private $nbspectators			= 0;
 	private $currentgmbase			= "";
 	private $currentmap				= null;
+	private $matchrecover			= false;
+	private $pointstorecover		= array();
 
 	// Settings to keep in memory
 	private $settings_nbroundsbymap	= 5;
@@ -395,7 +397,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_AUTHLEVEL, AuthenticationManager::getPermissionLevelNameArray(AuthenticationManager::AUTH_LEVEL_ADMIN), "Admin level needed to use the plugin");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_CUSTOM_GAMEMODE, "", "Load custom gamemode script (some functions can bug, for expert only)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_AFTERMATCH, array("TimeAttack"), "Gamemode to launch after the match");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Champion", "Cup", "Knockout",  "Laps", "Teams", "TimeAttack", "Rounds"), "Gamemode to launch for the match");
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Champion", "Cup", "Knockout", "Laps", "Teams", "TimeAttack", "Rounds"), "Gamemode to launch for the match");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_LOAD_MAPLIST_FILE, false, "Load Maps + Matchsettings from the file (or use the current maplist on the server)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_MAPLIST, "match.txt", "Maps + Matchsettings file to load (empty to use server login)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_MATCHSETTINGS_CONF, false, "Load configuration from matchsettings file instead of Admin Interface (can be usefull with a custom script)");
@@ -419,6 +421,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		//Register Admin Commands
 		$this->maniaControl->getCommandManager()->registerCommandListener('matchstart', $this, 'onCommandMatchStart', true, 'Start a match');
 		$this->maniaControl->getCommandManager()->registerCommandListener('matchstop', $this, 'onCommandMatchStop', true, 'Stop a match');
+		$this->maniaControl->getCommandManager()->registerCommandListener('matchrecover', $this, 'onCommandMatchRecover', true, 'Recover a match');
 		$this->maniaControl->getCommandManager()->registerCommandListener('matchendround', $this, 'onCommandMatchEndRound', true, 'Force end a round during a match');
 		$this->maniaControl->getCommandManager()->registerCommandListener('matchendwu', $this, 'onCommandMatchEndWU', true, 'Force end a WU during a match');
 		$this->maniaControl->getCommandManager()->registerCommandListener('matchsetpoints', $this, 'onCommandSetPoints', true, 'Sets points to a player.');
@@ -428,7 +431,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		//Register Player Commands
 		$this->maniaControl->getCommandManager()->registerCommandListener('pause', $this, 'onCommandSetPausePlayer', false, 'Set pause during a match.');
 		$this->maniaControl->getCommandManager()->registerCommandListener('ready', $this, 'onCommandSetReadyPlayer', false, 'Change status to Ready.');
-		
+
 		//Register Callbacks
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(GameModeSettings::CB_GAMEMODESETTINGS_CHANGED, $this, 'updateGMvariables');
@@ -438,6 +441,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERINFOCHANGED, $this, 'handlePlayerInfoChanged');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_SCORES, $this, 'handleEndRoundCallback');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_STARTROUNDSTART, $this, 'handleBeginRoundCallback');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_WARMUPSTARTROUND, $this, 'handleStartWarmUpCallback');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(CallbackManager::CB_MP_BEGINMATCH, $this, 'handleBeginMatchCallback');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_ONFINISHLINE, $this, 'handleFinishCallback');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(CallbackManager::CB_MP_MAPLISTMODIFIED, $this, 'handleMapListModified');
@@ -452,7 +456,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 
 		// Register Timers
 		$this->maniaControl->getTimerManager()->registerTimerListening($this, 'Periodic5SecondsLoop', 5000);
-		
+
 		// Register ManiaLink Pages
 		$this->maniaControl->getManialinkManager()->registerManialinkPageAnswerListener(self::ACTION_READY, $this, 'handleReady');
 
@@ -476,7 +480,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	 */
 	private function initTables() {
 		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-		$query  = 'CREATE TABLE IF NOT EXISTS `' . self::DB_MATCHESINDEX . '` (
+		$query = 'CREATE TABLE IF NOT EXISTS `' . self::DB_MATCHESINDEX . '` (
 			`matchid` VARCHAR(100) NOT NULL,
 			`server` VARCHAR(60) NOT NULL,
 			`gamemodebase` VARCHAR(32) NOT NULL,
@@ -488,7 +492,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		if ($mysqli->error) {
 			trigger_error($mysqli->error, E_USER_ERROR);
 		}
-		$query  = 'CREATE TABLE IF NOT EXISTS `' . self::DB_ROUNDSINDEX . '` (
+		$query = 'CREATE TABLE IF NOT EXISTS `' . self::DB_ROUNDSINDEX . '` (
 			`matchid` VARCHAR(100) NOT NULL,
 			`timestamp` INT(10) NOT NULL,
 			`nbmaps` INT(4) NOT NULL,
@@ -502,7 +506,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		if ($mysqli->error) {
 			trigger_error($mysqli->error, E_USER_ERROR);
 		}
-		$query  = 'CREATE TABLE IF NOT EXISTS `' . self::DB_ROUNDSDATA . '` (
+		$query = 'CREATE TABLE IF NOT EXISTS `' . self::DB_ROUNDSDATA . '` (
 			`matchid` VARCHAR(100) NOT NULL,
 			`timestamp` INT(10) NOT NULL,
 			`rank` INT(4) NOT NULL,
@@ -516,7 +520,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		if ($mysqli->error) {
 			trigger_error($mysqli->error, E_USER_ERROR);
 		}
-		$query  = 'CREATE TABLE IF NOT EXISTS `' . self::DB_TEAMSDATA . '` (
+		$query = 'CREATE TABLE IF NOT EXISTS `' . self::DB_TEAMSDATA . '` (
 			`matchid` VARCHAR(100) NOT NULL,
 			`timestamp` INT(10) NOT NULL,
 			`id` VARCHAR(30) NOT NULL,
@@ -626,7 +630,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 							$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Parameters not updated');
 						}
 						$this->updateGMvariables();
-	
 					} else {
 						$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Settings are loaded by Matchsettings file only.');
 					}
@@ -658,29 +661,47 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		$this->currentgmsettings = $this->maniaControl->getClient()->getModeScriptSettings();
 
 		if (isset($this->currentgmsettings[self::SETTING_MATCH_S_POINTSLIMIT])) {
-			$this->settings_pointlimit      = (int) $this->currentgmsettings[self::SETTING_MATCH_S_POINTSLIMIT];
+			$this->settings_pointlimit		= (int) $this->currentgmsettings[self::SETTING_MATCH_S_POINTSLIMIT];
 		}
 		if (isset($this->currentgmsettings[self::SETTING_MATCH_S_NBOFWINNERS])) {
-			$this->settings_nbwinners      = (int) $this->currentgmsettings[self::SETTING_MATCH_S_NBOFWINNERS];
+			$this->settings_nbwinners		= (int) $this->currentgmsettings[self::SETTING_MATCH_S_NBOFWINNERS];
 		}
 		if (isset($this->currentgmsettings[self::SETTING_MATCH_S_ROUNDSPERMAP])) {
-			$this->settings_nbroundsbymap      = (int) $this->currentgmsettings[self::SETTING_MATCH_S_ROUNDSPERMAP];
+			$this->settings_nbroundsbymap	= (int) $this->currentgmsettings[self::SETTING_MATCH_S_ROUNDSPERMAP];
 		}
 		if ($this->currentgmbase == "Champion") {
-			$this->settings_nbmapsbymatch      = (int) $this->currentgmsettings[self::SETTING_MATCH_S_ROUNDSLIMIT];
+			$this->settings_nbmapsbymatch	= (int) $this->currentgmsettings[self::SETTING_MATCH_S_ROUNDSLIMIT];
 		} elseif (isset($this->currentgmsettings[self::SETTING_MATCH_S_MAPSPERMATCH])) {	
-			$this->settings_nbmapsbymatch      = (int) $this->currentgmsettings[self::SETTING_MATCH_S_MAPSPERMATCH];
+			$this->settings_nbmapsbymatch	= (int) $this->currentgmsettings[self::SETTING_MATCH_S_MAPSPERMATCH];
 		}
 		if (isset($this->currentgmsettings[self::SETTING_MATCH_S_POINTSGAP])) {
-			$this->settings_pointsgap      = (int) $this->currentgmsettings[self::SETTING_MATCH_S_POINTSGAP];
+			$this->settings_pointsgap		= (int) $this->currentgmsettings[self::SETTING_MATCH_S_POINTSGAP];
 		}
 		if (isset($this->currentgmsettings[self::SETTING_MATCH_S_USETIEBREAK])) {
-			$this->settings_usetiebreak      = (int) $this->currentgmsettings[self::SETTING_MATCH_S_USETIEBREAK];
+			$this->settings_usetiebreak		= (int) $this->currentgmsettings[self::SETTING_MATCH_S_USETIEBREAK];
 		}
 	}
 
 	/**
-	 *  Function called to start the match
+	 * Function called to list matches
+	 */
+	public function getMatchesList($limit = 10) {
+		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
+		$query = "SELECT `gamemodebase`,`started`,`ended` FROM `" . self::DB_MATCHESINDEX . "`
+				ORDER BY `started` DESC LIMIT " . $limit;
+		$result = $mysqli->query($query);
+		if ($mysqli->error) {
+			trigger_error($mysqli->error);
+			return false;
+		}
+		while($row = $result->fetch_array()) {
+			$array[] = $row;
+		}
+		return $array;
+	}
+
+	/**
+	 * Function called to start the match
 	 */
 	public function MatchStart() {
 		$this->matchid = $this->maniaControl->getServer()->login . "-" . time();
@@ -701,10 +722,9 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		Logger::log("Match start with script " . $scriptName . '!');
 
 		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_LOAD_MAPLIST_FILE)) {
-			
 			Logger::log("Loading maplist + matchsettings");
 			if (empty($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_MAPLIST))) {
-				$server  = $this->maniaControl->getServer()->login;
+				$server = $this->maniaControl->getServer()->login;
 				$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $server . ".txt";
 			} else {
 				$maplist = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_MAPLIST);
@@ -729,8 +749,8 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		$this->maniaControl->getClient()->setScriptName($scriptName);
 
 		$this->matchStarted = true;
-		$this->nbmaps       = 0;
-		$this->nbrounds     = 0;
+		$this->nbmaps		= 0;
+		$this->nbrounds		= 0;
 
 		Logger::log("Get Players");
 		$players = $this->maniaControl->getPlayerManager()->getPlayers();
@@ -751,7 +771,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 
 		// MYSQL DATA INSERT
 		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-		$query  = 'INSERT INTO `' . self::DB_MATCHESINDEX . '`
+		$query = 'INSERT INTO `' . self::DB_MATCHESINDEX . '`
 			(`matchid`, `server`, `gamemodebase`, `started`, `ended`)
 			VALUES
 			("' . $this->matchid . '","' . $this->maniaControl->getServer()->login . '","' . $this->currentgmbase . '","' . time() . '","0" )';
@@ -764,9 +784,9 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		// Trigger Callback
 		$settings = [
 			'currentgmbase' => $this->currentgmbase,
-			'scriptName'    => $scriptName,
-			'maplist'       => $maplist,
-			'mapsshuffled'  => $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SHUFFLEMAPS)];
+			'scriptName'	=> $scriptName,
+			'maplist'		=> $maplist,
+			'mapsshuffled'	=> $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SHUFFLEMAPS)];
 		$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_STARTMATCH, $this->matchid, $settings);
 
 		Logger::log("Skip map");
@@ -774,7 +794,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	}
 
 	/**
-	 *  Function called to end the match
+	 * Function called to end the match
 	 */
 	public function MatchEnd() {
 		$scriptName = "Trackmania/TM_" ;
@@ -800,12 +820,14 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			$this->maniaControl->getChat()->sendSuccess($this->chatprefix . "Match finished");
 			Logger::log("Loading script: $scriptName");
 			Logger::log("Match finished");
-			$this->matchStarted = false;
-			$this->settingsloaded = false;
-			$this->mapsshuffled = false;
-			$this->postmatch = true;
-			$this->currentscore = [];
-			$this->matchid = "";
+			$this->matchStarted		= false;
+			$this->matchrecover		= false;
+			$this->pointstorecover	= array();
+			$this->currentscore		= [];
+			$this->settingsloaded	= false;
+			$this->mapsshuffled		= false;
+			$this->postmatch		= true;
+			$this->matchid			= "";
 
 			// KO Specifics variables
 			$this->nbstillalive = 0;
@@ -824,7 +846,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	}
 
 	/**
-	 *  Function called to stop the match
+	 * Function called to stop the match
 	 */
 	public function MatchStop() {
 		Logger::log("Match stop");
@@ -840,11 +862,14 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Match stopped by an Admin!');
 			$this->maniaControl->getClient()->setScriptName($scriptName);
 			Logger::log("Loading script: $scriptName");
-			$this->matchStarted  = false;
-			$this->settingsloaded = false;
-			$this->mapsshuffled = false;
-			$this->postmatch = true;
-			$this->matchid = "";
+			$this->matchStarted		= false;
+			$this->matchrecover		= false;
+			$this->pointstorecover	= array();
+			$this->currentscore		= [];
+			$this->settingsloaded	= false;
+			$this->mapsshuffled		= false;
+			$this->postmatch		= true;
+			$this->matchid			= "";
 
 			$players = $this->maniaControl->getPlayerManager()->getPlayers();
 			foreach ($players as $player) {
@@ -856,6 +881,109 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		}
 		Logger::log("Restarting map to load Gamemode");
 		$this->maniaControl->getClient()->restartMap();
+	}
+
+	/**
+	 * Function called to recover a match
+	 * @param integer $index
+	 */
+	public function MatchRecover(Int $index) {
+		Logger::log("Match Recover");
+
+		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
+		$query = "SELECT `matchid`,`gamemodebase` FROM `" . self::DB_MATCHESINDEX . "`
+				ORDER BY `started` DESC LIMIT " . $index . ",1";
+		$result = $mysqli->query($query);
+		$array = mysqli_fetch_array($result);
+		if (isset($array[0])) {
+			$gamemodebase = $array['gamemodebase'];
+			$matchid = $array['matchid'];
+			unset($array);
+			$this->matchrecover = true;
+			$query = "SELECT `timestamp`,`settings`,`nbmaps`,`nbrounds` FROM `" . self::DB_ROUNDSINDEX . "`
+					WHERE `matchid` = '" . $matchid . "'
+					ORDER BY `timestamp` DESC LIMIT 1";
+			$result = $mysqli->query($query);
+			$array = mysqli_fetch_array($result);
+			if (isset($array[0])) {
+				$nbmaps=$array['nbmaps'];
+				$nbrounds=$array['nbrounds'];
+				$settings=$array['settings'];
+				$timestamp=$array['timestamp'];
+				unset($array);
+				if ($gamemodebase == "Teams") {
+					$query = "SELECT `id` AS login,`points` AS matchpoints FROM `" . self::DB_TEAMSDATA . "`
+					WHERE `timestamp` = (SELECT `timestamp` FROM `" . self::DB_TEAMSDATA . "`
+					WHERE `matchid` = '" . $matchid . "' ORDER BY `timestamp` DESC LIMIT 1)" ;
+				} else {
+					$query = "SELECT `login`,`matchpoints` FROM `" . self::DB_ROUNDSDATA . "`
+					WHERE `timestamp` = '" . $timestamp . "'";
+				}
+				$result = $mysqli->query($query);
+				if ($mysqli->error) {
+					trigger_error($mysqli->error);
+					return false;
+				}
+				while($row = $result->fetch_array()) {
+					$array[] = $row;
+				}
+				if (isset($array[0])) {
+					$this->matchrecover = true;
+					foreach ($array as $index => $value) {
+						if (isset($value['login'])) {
+							$this->pointstorecover[$value['login']] = $value['matchpoints'];
+						}
+					}
+					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Recovering the match: ' . $matchid );
+					Logger::log('Recovering the match: ' . $matchid);
+					$this->MatchStart();
+				} else {
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'No data found from the last round');
+				}
+			} else {
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'No Rounds found for this match');
+			}
+		} else {
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Match not found');
+		}
+	}
+
+	/**
+	 * Function called to recover points
+	 */
+	private function recoverPoints() {
+		if (!empty($this->pointstorecover)) {
+			if ($this->currentgmbase == "Teams") {
+				// Blue Team
+				$this->maniaControl->getModeScriptEventManager()->setTrackmaniaTeamPoints("0", "", $this->pointstorecover[0], $this->pointstorecover[0]);
+				$this->maniaControl->getChat()->sendSuccess($this->chatprefix . '$<$ff0' . $this->pointstorecover[0] . '$> points recovered for the $<$00fBlue$> Team');
+				// Red Team
+				$this->maniaControl->getModeScriptEventManager()->setTrackmaniaTeamPoints("1", "", $this->pointstorecover[1], $this->pointstorecover[1]);
+				$this->maniaControl->getChat()->sendSuccess($this->chatprefix . '$<$ff0' . $this->pointstorecover[1] . '$> points recovered for the $<$f00Red$> Team');
+				Logger::log("Point recovered: Blue " . $this->pointstorecover[0] . " - Red " . $this->pointstorecover[1]);
+				$this->pointstorecover = [];
+			} else {
+				foreach ($this->pointstorecover as $index => $value) {
+					$player = $this->maniaControl->getPlayerManager()->getPlayer($index, true);
+					if ($player) {
+						if (!empty($this->currentscore)) {
+							$key = array_search($index, array_column($this->currentscore, '1'));
+							if (!($key === false)) {
+								$points = $value + $this->currentscore[$key][2];
+							} else {
+								$points = $value;
+							}
+						} else {
+							$points = $value;
+						}
+						$this->maniaControl->getModeScriptEventManager()->setTrackmaniaPlayerPoints($player, "", "", $points);
+						$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Your $<$ff0' . $value . '$> points have been recovered', $player);
+						unset($this->pointstorecover[$index]);
+						Logger::log("Point recovered: " . $index . " " . $points . "(+" . $value . ")");
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -874,8 +1002,8 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		}
 
 		$this->numberpause++;
-		$numberpause   = $this->numberpause;
-		$this->pauseon = true;
+		$numberpause	= $this->numberpause;
+		$this->pauseon	= true;
 
 		$this->maniaControl->getModeScriptEventManager()->startPause();
 		$this->maniaControl->getChat()->sendSuccessToAdmins($this->chatprefix . 'You can interrupt the pause with the command //matchendpause');
@@ -912,12 +1040,12 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	 */
 	public function displayReadyWidget($login) {
 		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_MODE) && (!$this->matchStarted)) {
-			$posX	 = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_POSX);
-			$posY	 = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_POSY);
-			$width	= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_WIDTH);
-			$height       = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_HEIGHT);
-			$quadStyle    = $this->maniaControl->getManialinkManager()->getStyleManager()->getDefaultQuadStyle();
-			$quadSubstyle = $this->maniaControl->getManialinkManager()->getStyleManager()->getDefaultQuadSubstyle();
+			$posX			= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_POSX);
+			$posY			= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_POSY);
+			$width			= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_WIDTH);
+			$height			= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_HEIGHT);
+			$quadStyle		= $this->maniaControl->getManialinkManager()->getStyleManager()->getDefaultQuadStyle();
+			$quadSubstyle	= $this->maniaControl->getManialinkManager()->getStyleManager()->getDefaultQuadSubstyle();
 
 			$maniaLink = new ManiaLink(self::MLID_MATCH_READY_WIDGET);
 
@@ -1129,14 +1257,14 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	}
 
 	/**
-	 *  Handle callback "BeginMatch"
+	 * Handle callback "BeginMatch"
 	 */
 	public function handleBeginMatchCallback() {
 		Logger::log("handleBeginMatchCallback");
 
 		if ($this->matchStarted === true) {
 			Logger::log("Check settingsloaded: " . $this->settingsloaded);
-			if (!($this->settingsloaded))   
+			if (!($this->settingsloaded))
 			{
 				Logger::log("Loading settings");
 				$this->settingsloaded = true;
@@ -1162,28 +1290,29 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 
 					$maps = $this->maniaControl->getMapManager()->getMaps();
 					$nbmaps = $this->maniaControl->getMapManager()->getMapsCount();
-					
+
 					$i = 1;
 					$this->currentmap = $this->maniaControl->getMapManager()->getCurrentMap();
-					$message =  $this->chatprefix . '$<$o$iCurrent Map:$>' . "\n";
-					$message .=  Formatter::stripCodes($this->currentmap->name);
+					$message = $this->chatprefix . '$<$o$iCurrent Map:$>' . "\n";
+					$message .= Formatter::stripCodes($this->currentmap->name);
 					$this->maniaControl->getChat()->sendInformation($message);
 					Logger::log("Current Map: " . Formatter::stripCodes($this->currentmap->name));
 					$continue = false;
-					$current  = false;
+					$current = false;
 					$message = "";
 					foreach ($maps as $map) { //TODO check no nextmap in cup mode
 						if ($this->currentmap->uid == $map->uid) {
 							$continue = true;
-							$current  = true;
+							$current = true;
 						}
 						if ($continue && $this->nbmaps < $this->settings_nbmapsbymatch) {
 							if ($current) {
 								$current = false;
 							} elseif (($this->nbmaps + $i) <= ($this->settings_nbmapsbymatch)) {
+								Logger::log("i: " . $i);
 								if ($i > 0) {
 									if ($i == 1) {
-										$message =  $this->chatprefix . '$<$o$iNext Maps:$>';
+										$message = $this->chatprefix . '$<$o$iNext Maps:$>';
 									}
 									Logger::log("Map " . $i . ": " . Formatter::stripCodes($map->name));
 									$message .= "\n" . $i . ": " . Formatter::stripCodes($map->name);
@@ -1199,11 +1328,12 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 						$this->maniaControl->getChat()->sendInformation($message);
 					}
 				}
+
 				// Trigger Callback
 				$currentstatus = [
 					'nbmaps'			=> $this->nbmaps,
 					'settings_nbmapsbymatch'	=> $this->settings_nbmapsbymatch];
-				$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_BEGINMAP,$this->matchid,  $currentstatus, $this->currentmap);
+				$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_BEGINMAP,$this->matchid, $currentstatus, $this->currentmap);
 			}
 		}
 		if ($this->postmatch) {
@@ -1227,11 +1357,24 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 				// Depending of the load of the server and the match gamemode, the script could be not loaded, this is a workaround to reload thhe script
 				$this->maniaControl->getClient()->restartMap();
 			}
+
 		}
 	}
 
 	/**
-	 *  Handle callback "BeginRound"
+	 * Handle callback "WarmUp.StartRound"
+	 */
+	public function handleStartWarmUpCallback() {
+		Logger::log("handleStartWarmUpCallback");
+
+		// Match Recover
+		if ($this->matchrecover) {
+			$this->recoverPoints();
+		}
+	}
+
+	/**
+	 * Handle callback "BeginRound"
 	 */
 	public function handleBeginRoundCallback() {
 		Logger::log("handleBeginRoundCallback");
@@ -1263,6 +1406,11 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 					$this->maniaControl->getChat()->sendInformation($this->chatprefix . '$s$<$o$iMap: ' . ($this->nbmaps));
 					Logger::log("Map: " . $this->nbmaps);
 				}
+			}
+
+			// Match Recover
+			if ($this->matchrecover) {
+				$this->recoverPoints();
 			}
 		}
 	}
@@ -1326,41 +1474,41 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			else {
 				$timestamp = time();
 
-				if ($structure->getSection() == "PreEndRound" && in_array($this->currentgmbase, ["Cup", "Teams", "Rounds"]))   {
+				if ($structure->getSection() == "PreEndRound" && in_array($this->currentgmbase, ["Cup", "Teams", "Rounds"])) {
 					$realSection = true;
 				} elseif ($structure->getSection() == "EndRound" && in_array($this->currentgmbase, ["Champion", "Knockout", "Laps", "TimeAttack"])) {
 					$realSection = true;
 				} else {
 					$realSection = false;
 				}
-	
+
 				if ($realSection) {
 					if ($this->nbmaps != 0 and ($this->nbrounds != $this->settings_nbroundsbymap || $this->nbrounds == 0 )) {
-						$database	   = "";
+						$database		= "";
 						$this->currentscore = array();
-						$results	    = $structure->getPlayerScores();
-						$scores	     = array();
-						
+						$results		= $structure->getPlayerScores();
+						$scores			= array();
+
 						// CUP Specific variables
-						$this->nbwinners    = 0;
-	
+						$this->nbwinners = 0;
+
 						// Knockout Specific variables
 						$this->nbstillalive = 0;
-	
+
 						$pointsrepartition = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_S_POINTSREPARTITION);
 						$pointsrepartition = explode(',', $pointsrepartition);
-						
-						$dbquery  = 'INSERT INTO `' . self::DB_ROUNDSDATA . '` (`matchid`,`timestamp`,`rank`,`login`,`matchpoints`,`roundpoints`,`time`,`teamid`) VALUES ';
-	
+
+						$dbquery = 'INSERT INTO `' . self::DB_ROUNDSDATA . '` (`matchid`,`timestamp`,`rank`,`login`,`matchpoints`,`roundpoints`,`time`,`teamid`) VALUES ';
+
 						foreach ($results as $result) {
-							$rank	    = $result->getRank();
-							$player	  	= $result->getPlayer();
-							$time	    = $result->getPrevRaceTime();
-								
+							$rank		= $result->getRank();
+							$player		= $result->getPlayer();
+							$time		= $result->getPrevRaceTime();
+
 							if (in_array($this->currentgmbase, ["Champion", "Cup", "Knockout", "Teams", "Rounds"]) && !($result->getMatchPoints() == 0 && ($player->isSpectator || $player->isFakePlayer()))) {
-								$roundpoints = $result->getRoundPoints();
-								$points      = $result->getMatchPoints();
-	
+								$roundpoints	= $result->getRoundPoints();
+								$points			= $result->getMatchPoints();
+
 								if ($this->currentgmbase == "Champion") {
 									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, $points , $result->getMapPoints(), $time, "")));
 								} elseif ($this->currentgmbase == "Cup") {	
@@ -1382,25 +1530,25 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 								}
 							}
 						}
-	
+
 						Logger::log('Count number of players finish: '. count($this->times));
-	
+
 						if (!$this->pauseon && !$this->skipround) {
 							$this->nbrounds++;
 						}
 						if ($this->skipround) {
 							$this->skipround = false;
 						}
-						
-						if ($this->currentgmbase == "Knockout" && $this->maniaControl->getSettingManager()->getSettingValue($this,  self::SETTING_MATCH_S_ROUNDSWITHOUTELIMINATION) <= $this->nbrounds && $this->nbmaps == 1) {
+
+						if ($this->currentgmbase == "Knockout" && $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_S_ROUNDSWITHOUTELIMINATION) <= $this->nbrounds && $this->nbmaps == 1) {
 							Logger::log("Round without elimination");
 						}
-						
+
 						// MYSQL DATA INSERT
 						$settings = json_encode($this->maniaControl->getClient()->getModeScriptSettings());
 						$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-	
-						$query  = 'INSERT INTO `' . self::DB_ROUNDSINDEX . '` 
+
+						$query = 'INSERT INTO `' . self::DB_ROUNDSINDEX . '` 
 							(`matchid`,`timestamp`,`nbmaps`,`nbrounds`,`settings`,`map`,`nbplayers`,`nbspectators`)
 							VALUES
 							("'. $this->matchid . '","' . $timestamp . '","' . $this->nbmaps . '","' . $this->nbrounds . '",' . "'" . $settings . "'" . ',"' . $this->currentmap->uid . '","' . $this->maniaControl->getPlayerManager()->getPlayerCount() . '","' . $this->maniaControl->getPlayerManager()->getSpectatorCount() . '")';
@@ -1408,7 +1556,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 						if ($mysqli->error) {
 							trigger_error($mysqli->error);
 						}
-	
+
 						// Round data
 						foreach ($this->currentscore as $value) {
 							$dbquery .= '("' . $this->matchid . '","' . $timestamp . '","' . implode('","',$value) . '"),';
@@ -1418,9 +1566,9 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 						if ($mysqli->error) {
 							trigger_error($mysqli->error);
 						}
-	
+
 						Logger::log("Rounds finished: " . $this->nbrounds);
-						
+
 						// Trigger Callback
 						$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_ENDROUND, $this->matchid, $this->currentscore, []);
 					}
@@ -1430,7 +1578,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 					$teamresults = $structure->getTeamScores();
 					$this->currentteamsscore = array();
 
-					$teamdbquery  = 'INSERT INTO `' . self::DB_TEAMSDATA . '` (`matchid`,`timestamp`,`id`,`team`,`points`) VALUES ';
+					$teamdbquery = 'INSERT INTO `' . self::DB_TEAMSDATA . '` (`matchid`,`timestamp`,`id`,`team`,`points`) VALUES ';
 					$this->currentteamsscore = [];
 					$rank = 1;
 					foreach ($teamresults as $teamresult) {
@@ -1454,7 +1602,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	}
 
 	/**
-	 *  Command /matchstart for admins
+	 * Command //matchstart for admins
 	 * 
 	 * @param array			$chatCallback
 	 * @param \ManiaControl\Players\Player $player
@@ -1469,7 +1617,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	}
 
 	/**
-	 *  Command /matchstop for admins
+	 * Command //matchstop for admins
 	 * 
 	 * @param array			$chatCallback
 	 * @param \ManiaControl\Players\Player $player
@@ -1484,6 +1632,47 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			$this->MatchStop();
 		} else {
 			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Impossible to stop a match during a pause' ,$player);
+		}
+	}
+
+	/**
+	 * Command //matchrecover for admins
+	 * 
+	 * @param array			$chatCallback
+	 * @param \ManiaControl\Players\Player $player
+	 */
+	public function onCommandMatchRecover(array $chatCallback, Player $player) {
+		$authLevel = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_AUTHLEVEL);
+		if (!$this->maniaControl->getAuthenticationManager()->checkRight($player, AuthenticationManager::getAuthLevel($authLevel))) {
+			$this->maniaControl->getAuthenticationManager()->sendNotAllowed($player);
+			return;
+		}
+		$text = $chatCallback[1][2];
+		$text = explode(" ", $text);
+
+		if (is_numeric($text[1])) {
+			$this->MatchRecover($text[1]);
+		} elseif ($text[1] == "latest") {
+			$this->MatchRecover(0);
+		} else {
+			$lastmatches = $this->getMatchesList(3);
+
+			$message = $this->chatprefix . '$<run this command with an index or "latest"$>' . "\n";
+
+			foreach ($lastmatches as $index => $value) {
+				if ($index >= 3) {
+					break;
+				}
+				$message .= '$<' . $index . ' - ' . $value['gamemodebase'] . ' started at ' . date("H:i:s", $value['started']);
+				if ($value['ended'] == "0") {
+					$message .= " (Not finished)$>\n";
+				} else {
+					$message .= " (Finished at " . date("H:i:s", $value['ended'] ). ")$>\n";
+				}
+			}
+			$this->maniaControl->getChat()->sendSuccess($message, $player);
+			$this->maniaControl->getChat()->sendError($this->chatprefix . 'For the moment, only point recovery is supported, you have to manage maps and rounds manually');
+
 		}
 	}
 
@@ -1541,7 +1730,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			$text = explode(" ", $text);
 			if (isset($text[1]) && $text[1] != "") {
 				if (is_numeric($text[1]) && $text[1] > 0) {
-					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Admin force a break for ' . $text[1] . ' seconds!');
+					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Admin force a break for $<$ff0' . $text[1] . '$> seconds!');
 					$this->setNadeoPause(true, $text[1]);
 				} elseif (is_numeric($text[1]) && $text[1] == 0) {
 					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Admin force an unlimited break');
@@ -1560,7 +1749,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	}
 
 	/**
-	 * Command /matchendpause for admins
+	 * Command //matchendpause for admins
 	 * 
 	 * @param array			$chatCallback
 	 * @param \ManiaControl\Players\Player $player
@@ -1598,32 +1787,31 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		if (isset($text[1]) && isset($text[2]) && is_numeric($text[2]) && $text[2] >= 0 ) {
 			if (strcasecmp($text[1], "Blue") == 0 || $text[1] == "0") { //TODO: add support of Custom teams
 				$this->maniaControl->getModeScriptEventManager()->setTrackmaniaTeamPoints("0", "", $text[2], $text[2]);
-				$this->maniaControl->getChat()->sendSuccess($this->chatprefix . '$<$00fBlue$> Team now has ' . $text[2] . ' points!');
+				$this->maniaControl->getChat()->sendSuccess($this->chatprefix . '$<$00fBlue$> Team now has $<$ff0' . $text[2] . '$> points!');
 			} elseif (strcasecmp($text[1], "Red") == 0 || $text[1] == "1") {
 				$this->maniaControl->getModeScriptEventManager()->setTrackmaniaTeamPoints("1", "", $text[2]	, $text[2]);
-				$this->maniaControl->getChat()->sendSuccess($this->chatprefix . '$<$f00Red$> Team now has ' . $text[2] . ' points!');
+				$this->maniaControl->getChat()->sendSuccess($this->chatprefix . '$<$f00Red$> Team now has $<$ff0' . $text[2] . '$> points!');
 			} else {
 				$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-				$query  = 'SELECT login FROM `' . PlayerManager::TABLE_PLAYERS . '` WHERE nickname LIKE "' . $text[1] . '"';
+				$query = 'SELECT login FROM `' . PlayerManager::TABLE_PLAYERS . '` WHERE nickname LIKE "' . $text[1] . '"';
 				$result = $mysqli->query($query);
 				$array = mysqli_fetch_array($result);
-	
+
 				if (isset($array[0])) {
 						$login = $array[0];
-				} elseif (strlen($text[1]) == 22) {
-						$login = $text[1] ;
+				} elseif (strlen($peopletoadd) == 22) {
+						$login = $peopletoadd ;
 				}
 				if ($mysqli->error) {
 						trigger_error($mysqli->error, E_USER_ERROR);
 				}
-				
+
 				if (isset($login)) {
-					$player = $this->maniaControl->getPlayerManager()->getPlayer($login);
+					$player = $this->maniaControl->getPlayerManager()->getPlayer($login,true);
 					if ($player) {
 						$this->maniaControl->getModeScriptEventManager()->setTrackmaniaPlayerPoints($player, "", "", $text[2]);
-						$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> now has ' . $text[2] . ' points!');
+						$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> now has $<$ff0' . $text[2] . '$> points!');
 					} else {
-						$this->maniaControl->getModeScriptEventManager()->setTrackmaniaPlayerPoints($player, "", "", $text[2]);
 						$this->maniaControl->getChat()->sendError($this->chatprefix . 'Player ' . $text[1] . " isn't connected", $adminplayer);
 					}
 				} else {
