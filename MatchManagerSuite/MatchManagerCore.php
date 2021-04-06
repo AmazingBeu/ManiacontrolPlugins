@@ -39,7 +39,7 @@ use Maniaplanet\DedicatedServer\InvalidArgumentException;
 class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 1.1;
+	const PLUGIN_VERSION									= 1.2;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
