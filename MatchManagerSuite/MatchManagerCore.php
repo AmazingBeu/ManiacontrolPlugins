@@ -39,7 +39,7 @@ use Maniaplanet\DedicatedServer\InvalidArgumentException;
 class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 1.2;
+	const PLUGIN_VERSION									= 1.3;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -238,7 +238,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			'gamemode' => ['Champion', 'Cup', 'Knockout', 'Teams', 'Rounds'],
 			'type' => 'integer',
 			'default' => 5,
-			'description' => 'Number of rounds par map (0 = unlimited) (multiple maps doesn\'t work in KO)' ],
+			'description' => 'Number of rounds par map (0 = unlimited)' ],
 		self::SETTING_MATCH_S_ROUNDSWITHAPHASECHANGE => [
 			'gamemode' => ['Champion'],
 			'type' => 'string',
@@ -855,7 +855,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		$scriptName .= "_Online.Script.txt";
 
 		try {
-
 			// Trigger Callback
 			$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_STOPMATCH, $this->matchid, $this->currentscore, $this->currentteamsscore);
 
@@ -1309,7 +1308,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 							if ($current) {
 								$current = false;
 							} elseif (($this->nbmaps + $i) <= ($this->settings_nbmapsbymatch)) {
-								Logger::log("i: " . $i);
 								if ($i > 0) {
 									if ($i == 1) {
 										$message = $this->chatprefix . '$<$o$iNext Maps:$>';
@@ -1487,7 +1485,9 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 						$database		= "";
 						$this->currentscore = array();
 						$results		= $structure->getPlayerScores();
-						$scores			= array();
+
+						// Resort scores
+						usort($results, function ($a, $b) { return -($a->getMatchPoints() + $a->getRoundPoints() <=> $b->getMatchPoints() + $b->getRoundPoints()); });
 
 						// CUP Specific variables
 						$this->nbwinners = 0;
@@ -1499,9 +1499,9 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 						$pointsrepartition = explode(',', $pointsrepartition);
 
 						$dbquery = 'INSERT INTO `' . self::DB_ROUNDSDATA . '` (`matchid`,`timestamp`,`rank`,`login`,`matchpoints`,`roundpoints`,`time`,`teamid`) VALUES ';
+						$rank = 1;
 
 						foreach ($results as $result) {
-							$rank		= $result->getRank();
 							$player		= $result->getPlayer();
 							$time		= $result->getPrevRaceTime();
 
@@ -1529,6 +1529,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, "-1", "-1", $besttime, "-1")));
 								}
 							}
+							$rank++;
 						}
 
 						Logger::log('Count number of players finish: '. count($this->times));
@@ -1578,11 +1579,15 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 					$teamresults = $structure->getTeamScores();
 					$this->currentteamsscore = array();
 
+					// Resort scores
+					usort($results, function ($a, $b) { return -($a->getMatchPoints() <=> $b->getMatchPoints()); });
+
 					$teamdbquery = 'INSERT INTO `' . self::DB_TEAMSDATA . '` (`matchid`,`timestamp`,`id`,`team`,`points`) VALUES ';
 					$this->currentteamsscore = [];
 					$rank = 1;
+
 					foreach ($teamresults as $teamresult) {
-						$this->currentteamsscore = array_merge($this->currentteamsscore, array(array($rank, $teamresult->getTeamId(), $teamresult->getMatchPoints())));
+						$this->currentteamsscore = array_merge($this->currentteamsscore, array(array($rank, $teamresult->getTeamId(), $teamresult->getName(), $teamresult->getMatchPoints())));
 						$teamdbquery .= '("' . $this->matchid . '","' . $timestamp . '","' . $teamresult->getTeamId() . '","' . $teamresult->getName() . '","' . $teamresult->getMatchPoints() . '"),';
 						$rank++;
 					}
