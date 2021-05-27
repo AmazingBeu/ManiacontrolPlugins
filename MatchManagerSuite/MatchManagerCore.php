@@ -39,7 +39,7 @@ use Maniaplanet\DedicatedServer\InvalidArgumentException;
 class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 1.3;
+	const PLUGIN_VERSION									= 1.4;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -1487,7 +1487,9 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 						$results		= $structure->getPlayerScores();
 
 						// Resort scores
-						usort($results, function ($a, $b) { return -($a->getMatchPoints() + $a->getRoundPoints() <=> $b->getMatchPoints() + $b->getRoundPoints()); });
+						if ($structure->getSection() == "PreEndRound") {
+							usort($results, function ($a, $b) { return -($a->getMatchPoints() + $a->getRoundPoints() <=> $b->getMatchPoints() + $b->getRoundPoints()); });
+						}
 
 						// CUP Specific variables
 						$this->nbwinners = 0;
@@ -1865,3 +1867,4 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		}
 	}
 }
+
