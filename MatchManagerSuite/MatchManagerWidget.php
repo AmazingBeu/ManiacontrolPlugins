@@ -23,6 +23,12 @@ use ManiaControl\Plugins\Plugin;
 use ManiaControl\Settings\Setting;
 use ManiaControl\Settings\SettingManager;
 use ManiaControl\Utils\Formatter;
+
+if (! class_exists('MatchManagerSuite\MatchManagerCore')) {
+	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is needed to use MatchManager Widget plugin. Install it and restart Maniacontrol');
+	Logger::logError('MatchManager Core is needed to use MatchManager Widget plugin. Install it and restart Maniacontrol');
+	return false;
+}
 use MatchManagerSuite\MatchManagerCore;
 
 
@@ -37,7 +43,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 * Constants
 	 */
 	const PLUGIN_ID											= 153;
-	const PLUGIN_VERSION									= 1.0;
+	const PLUGIN_VERSION									= 1.1;
 	const PLUGIN_NAME										= 'MatchManager Widget';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -119,6 +125,10 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	public function load(ManiaControl $maniaControl) {
 		$this->maniaControl = $maniaControl;
 		$this->MatchManagerCore = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERCORE_PLUGIN);
+
+		if ($this->MatchManagerCore == Null) {
+			throw new \Exception('MatchManager Core is needed to use MatchManager Widget plugin');
+		}
 
 		// Callbacks
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
@@ -501,4 +511,5 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 		}
 	}
 }
+
 
