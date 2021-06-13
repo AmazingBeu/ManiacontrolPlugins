@@ -11,11 +11,17 @@ use ManiaControl\Players\Player;
 use ManiaControl\Plugins\Plugin;
 use ManiaControl\Settings\Setting;
 use ManiaControl\Settings\SettingManager;
-use MatchManagerSuite\MatchManagerCore;
 use ManiaControl\Utils\WebReader;
 use ManiaControl\Files\AsyncHttpRequest;
 use ManiaControl\Commands\CommandListener;
 use ManiaControl\Admin\AuthenticationManager;
+
+if (! class_exists('MatchManagerSuite\MatchManagerCore')) {
+	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is needed to use MatchManagerGSheet plugin. Install it and restart Maniacontrol');
+	Logger::logError('MatchManager Core is needed to use MatchManager GSheet plugin. Install it and restart Maniacontrol');
+	return false;
+}
+use MatchManagerSuite\MatchManagerCore;
 
 
 /**
@@ -29,7 +35,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 0.1;
+	const PLUGIN_VERSION									= 0.2;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -107,9 +113,12 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 		$this->initTables();
 		$this->MatchManagerCore = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERCORE_PLUGIN);
 
+		if ($this->MatchManagerCore == Null) {
+			throw new \Exception('MatchManager Core is needed to use MatchManager GSheet plugin');
+		}
+
 		// Callbacks
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
-		
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STARTMATCH, $this, 'CheckAndPrepareSheet');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_ENDROUND, $this, 'onCallbackEndRound');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_ENDMATCH, $this, 'onCallbackEndMatch');
@@ -134,7 +143,6 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	 * @see \ManiaControl\Plugins\Plugin::unload()
 	 */
 	public function unload() {
-		$this->closeWidgets();
 	}
 
 	/**
@@ -394,12 +402,22 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$data->data[0]->values = array(array($this->matchstatus),array($this->MatchManagerCore->getCountMap()),array($this->MatchManagerCore->getCountRound()));
 
 			$data->data[1] = new \stdClass;
-			$data->data[1]->range = "'" . $sheetname . "'!D2";
-			$data->data[1]->values = $currentscore;
+			$data->data[1]->range = "'" . $sheetname . "'!A7";
+
+			$players = [];
+			foreach ($this->maniaControl->getPlayerManager()->getPlayers() as $player) {
+				array_push($players,array($player->login, $player->nickname));
+			}
+
+			$data->data[1]->values = $players;
 
 			$data->data[2] = new \stdClass;
-			$data->data[2]->range = "'" . $sheetname . "'!K2";
-			$data->data[2]->values = $currentteamsscore;
+			$data->data[2]->range = "'" . $sheetname . "'!D2";
+			$data->data[2]->values = $currentscore;
+
+			$data->data[3] = new \stdClass;
+			$data->data[3]->range = "'" . $sheetname . "'!K2";
+			$data->data[3]->values = $currentteamsscore;
 
 			$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values:batchUpdate');
 			$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
@@ -472,14 +490,13 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	}
 
 	private function PrepareSheet(String $sheetname, array $sheetsid) {
-		if ($this->refreshTokenIfNeeded()) {
-			Logger::Log("Creating new Sheet: " . $sheetname);
- 
+		if ($this->refreshTokenIfNeeded()) { 
 			$data = new \stdClass;
 			$data->requests = array();
 			$i = 0;
 
 			if (count($sheetsid) > 1 || (count($sheetsid) == 1 && $sheetsid[0] == "0")) {
+				Logger::Log("Creating new Sheet: " . $sheetname);
 				$sheetid = rand(1000000000,2147483646);
 				while (in_array($sheetid, $sheetsid)) {
 					$sheetid = rand(1000000000,2147483646);
@@ -524,7 +541,26 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$data->requests[$i]->repeatCell->cell->userEnteredFormat->textFormat = new \stdClass;
 			$data->requests[$i]->repeatCell->cell->userEnteredFormat->textFormat->bold = true;
 			$data->requests[$i]->repeatCell->fields = "userEnteredFormat(backgroundColor,textFormat)";
+			$i++;
 
+			//Player list
+			$data->requests[$i] = new \stdClass;
+			$data->requests[$i]->repeatCell = new \stdClass;
+			$data->requests[$i]->repeatCell->range = new \stdClass;
+			$data->requests[$i]->repeatCell->range->sheetId = $sheetid;
+			$data->requests[$i]->repeatCell->range->startRowIndex = 5;
+			$data->requests[$i]->repeatCell->range->endRowIndex = 6;
+			$data->requests[$i]->repeatCell->range->startColumnIndex = 0;
+			$data->requests[$i]->repeatCell->range->endColumnIndex = 2;
+			$data->requests[$i]->repeatCell->cell = new \stdClass;
+			$data->requests[$i]->repeatCell->cell->userEnteredFormat = new \stdClass;
+			$data->requests[$i]->repeatCell->cell->userEnteredFormat->backgroundColor = new \stdClass;
+			$data->requests[$i]->repeatCell->cell->userEnteredFormat->backgroundColor->red = 0.6;
+			$data->requests[$i]->repeatCell->cell->userEnteredFormat->backgroundColor->green = 0.9;
+			$data->requests[$i]->repeatCell->cell->userEnteredFormat->backgroundColor->blue = 0.6;
+			$data->requests[$i]->repeatCell->cell->userEnteredFormat->textFormat = new \stdClass;
+			$data->requests[$i]->repeatCell->cell->userEnteredFormat->textFormat->bold = true;
+			$data->requests[$i]->repeatCell->fields = "userEnteredFormat(backgroundColor,textFormat)";
 			$i++;
 
 			//Score Table
@@ -573,56 +609,57 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
 			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 			$asyncHttpRequest->setContent(json_encode($data));
-			$asyncHttpRequest->setCallable(function ($json, $error) {
-				$data = json_decode($json);
-				if ($error || !$data) {
-					Logger::logError('Error while Sending data: ' . print_r($error, true));
-				}
-			});
-			$asyncHttpRequest->postData(1000);
-
-
-			// Add headers data
-			$data = new \stdClass;
-			$data->valueInputOption = "USER_ENTERED";
-
-			$data->data[0] = new \stdClass;
-			$data->data[0]->range = "'" . $sheetname . "'!A1";
-			$data->data[0]->values = array(array("Informations"),array("Match status:", $this->matchstatus),array("Maps:","0/0"),array("Rounds:","0/0"));
-
-			$data->data[1] = new \stdClass;
-			$data->data[1]->range = "'" . $sheetname . "'!D1";
-			$data->data[1]->values = array(array("Rank","Login", "MatchPoints", "RoundPoints","Time","Team"));
-
-			$data->data[2] = new \stdClass;
-			$data->data[2]->range = "'" . $sheetname . "'!K1";
-			$data->data[2]->values = array(array("Rank","Team ID", "Name", "MatchPoints"));
-
-			$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values:batchUpdate');
-			$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
-			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
-			$asyncHttpRequest->setContent(json_encode($data));
-			$asyncHttpRequest->setCallable(function ($json, $error) {
-				$data = json_decode($json);
-				if ($error || !$data) {
-					Logger::logError('Error while Sending data: ' . print_r($error, true));
-				}
-			});
-	
-			$asyncHttpRequest->postData(1000);
-
-			// Clear Scoreboards data
-			$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values/' . urlencode("'". $sheetname . "'") . '!D2:N300:clear');
-			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
-			$asyncHttpRequest->setCallable(function ($json, $error) {
+			$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname) {
 				var_dump($json);
 				$data = json_decode($json);
 				if ($error || !$data) {
 					Logger::logError('Error while Sending data: ' . print_r($error, true));
 				}
+
+				// Add headers data
+				$data = new \stdClass;
+				$data->valueInputOption = "USER_ENTERED";
+
+				$data->data[0] = new \stdClass;
+				$data->data[0]->range = "'" . $sheetname . "'!A1";
+				$data->data[0]->values = array(array("Informations"),array("Match status:", $this->matchstatus),array("Maps:","0/0"),array("Rounds:","0/0"),array(),array("Login:","Nickname:"));
+
+				$data->data[1] = new \stdClass;
+				$data->data[1]->range = "'" . $sheetname . "'!D1";
+				$data->data[1]->values = array(array("Rank","Login", "MatchPoints", "RoundPoints","Time","Team"));
+
+				$data->data[2] = new \stdClass;
+				$data->data[2]->range = "'" . $sheetname . "'!K1";
+				$data->data[2]->values = array(array("Rank","Team ID", "Name", "MatchPoints"));
+
+				$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values:batchUpdate');
+				$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
+				$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
+				$asyncHttpRequest->setContent(json_encode($data));
+				$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname) {
+					var_dump($json);
+					$data = json_decode($json);
+					if ($error || !$data) {
+						Logger::logError('Error while Sending data: ' . print_r($error, true));
+					}
+
+					// Clear Scoreboards data
+					$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values/' . urlencode("'". $sheetname . "'") . '!D2:N300:clear');
+					$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
+					$asyncHttpRequest->setCallable(function ($json, $error) {
+						$data = json_decode($json);
+						if ($error || !$data) {
+							var_dump($json);
+							Logger::logError('Error while Sending data: ' . print_r($error, true));
+						}
+					});
+			
+					$asyncHttpRequest->postData(1000);
+				});
+				$asyncHttpRequest->postData(1000);
 			});
-	
 			$asyncHttpRequest->postData(1000);
+
 		}
 	}
 }
