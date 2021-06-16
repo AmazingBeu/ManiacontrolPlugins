@@ -35,7 +35,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 0.2;
+	const PLUGIN_VERSION									= 0.3;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -60,6 +60,8 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	private $device_code			= "";
 	private $access_token			= "";
 	private $matchid				= "";
+
+	private $playerlist				= array();
 
 	/**
 	 * @param \ManiaControl\ManiaControl $maniaControl
@@ -375,6 +377,8 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			});
 	
 			$asyncHttpRequest->getData(1000);
+		} else {
+			$this->maniaControl->getChat()->sendError("Can't have access to Google API service", $player);
 		}
 	}
 
@@ -404,9 +408,13 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$data->data[1] = new \stdClass;
 			$data->data[1]->range = "'" . $sheetname . "'!A7";
 
-			$players = [];
+			
 			foreach ($this->maniaControl->getPlayerManager()->getPlayers() as $player) {
-				array_push($players,array($player->login, $player->nickname));
+				$this->playerlist[$player->login] = $player->nickname;
+			}
+			$players = [];
+			foreach ($this->playerlist as $login => $nickname) {
+				array_push($players,array($login, $nickname));
 			}
 
 			$data->data[1]->values = $players;
@@ -465,22 +473,24 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 					Logger::logError('Json parse error: ' . $json);
 					return;
 				}
-				if ($data->properties->title) {
-					$sheetname = $this->getSheetName();
 
+				if ($data->properties->title) {
 					$sheetsid = array();
+					$sheetname = $this->getSheetName();
+					$sheetexists = false;
 					foreach($data->sheets as $value) {
 						if ($value->properties->title == $sheetname) {
 							unset($sheetsid);
 							$sheetsid = array();
 							$sheetsid[0] = $value->properties->sheetId;
+							$sheetexists = true;
 							break;
 						} else {
 							array_push($sheetsid,$value->properties->sheetId);
 						}
 					}
 					$this->matchstatus = "starting";
-					$this->PrepareSheet($sheetname, $sheetsid);
+					$this->PrepareSheet($sheetname, $sheetexists, $sheetsid );
 
 				}
 			});
@@ -489,13 +499,19 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 		}
 	}
 
-	private function PrepareSheet(String $sheetname, array $sheetsid) {
+	private function PrepareSheet(String $sheetname, bool $sheetexists, Array $sheetsid) {
 		if ($this->refreshTokenIfNeeded()) { 
+
+			$this->playerlist = array();
+			foreach ($this->maniaControl->getPlayerManager()->getPlayers() as $player) {
+				$this->playerlist[$player->login] = $player->nickname;
+			}
+
 			$data = new \stdClass;
 			$data->requests = array();
 			$i = 0;
 
-			if (count($sheetsid) > 1 || (count($sheetsid) == 1 && $sheetsid[0] == "0")) {
+			if (!$sheetexists) {
 				Logger::Log("Creating new Sheet: " . $sheetname);
 				$sheetid = rand(1000000000,2147483646);
 				while (in_array($sheetid, $sheetsid)) {
@@ -610,56 +626,49 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 			$asyncHttpRequest->setContent(json_encode($data));
 			$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname) {
-				var_dump($json);
 				$data = json_decode($json);
 				if ($error || !$data) {
 					Logger::logError('Error while Sending data: ' . print_r($error, true));
 				}
-
-				// Add headers data
-				$data = new \stdClass;
-				$data->valueInputOption = "USER_ENTERED";
-
-				$data->data[0] = new \stdClass;
-				$data->data[0]->range = "'" . $sheetname . "'!A1";
-				$data->data[0]->values = array(array("Informations"),array("Match status:", $this->matchstatus),array("Maps:","0/0"),array("Rounds:","0/0"),array(),array("Login:","Nickname:"));
-
-				$data->data[1] = new \stdClass;
-				$data->data[1]->range = "'" . $sheetname . "'!D1";
-				$data->data[1]->values = array(array("Rank","Login", "MatchPoints", "RoundPoints","Time","Team"));
-
-				$data->data[2] = new \stdClass;
-				$data->data[2]->range = "'" . $sheetname . "'!K1";
-				$data->data[2]->values = array(array("Rank","Team ID", "Name", "MatchPoints"));
-
-				$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values:batchUpdate');
-				$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
+				// Clear Scoreboards data
+				$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values/' . urlencode("'". $sheetname . "'") . '!A1:N300:clear');
 				$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
-				$asyncHttpRequest->setContent(json_encode($data));
 				$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname) {
-					var_dump($json);
 					$data = json_decode($json);
 					if ($error || !$data) {
 						Logger::logError('Error while Sending data: ' . print_r($error, true));
 					}
+					// Add headers data
+					$data = new \stdClass;
+					$data->valueInputOption = "USER_ENTERED";
 
-					// Clear Scoreboards data
-					$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values/' . urlencode("'". $sheetname . "'") . '!D2:N300:clear');
+					$data->data[0] = new \stdClass;
+					$data->data[0]->range = "'" . $sheetname . "'!A1";
+					$data->data[0]->values = array(array("Informations"),array("Match status:", $this->matchstatus),array("Maps:","0/0"),array("Rounds:","0/0"),array(),array("Login:","Nickname:"));
+
+					$data->data[1] = new \stdClass;
+					$data->data[1]->range = "'" . $sheetname . "'!D1";
+					$data->data[1]->values = array(array("Rank","Login", "MatchPoints", "RoundPoints","Time","Team"));
+
+					$data->data[2] = new \stdClass;
+					$data->data[2]->range = "'" . $sheetname . "'!K1";
+					$data->data[2]->values = array(array("Rank","Team ID", "Name", "MatchPoints"));
+
+					$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values:batchUpdate');
+					$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
 					$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
-					$asyncHttpRequest->setCallable(function ($json, $error) {
+					$asyncHttpRequest->setContent(json_encode($data));
+					$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname) {
 						$data = json_decode($json);
 						if ($error || !$data) {
-							var_dump($json);
 							Logger::logError('Error while Sending data: ' . print_r($error, true));
 						}
 					});
-			
 					$asyncHttpRequest->postData(1000);
 				});
 				$asyncHttpRequest->postData(1000);
 			});
 			$asyncHttpRequest->postData(1000);
-
 		}
 	}
 }
