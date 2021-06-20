@@ -5,7 +5,6 @@ namespace MatchManagerSuite;
 use Exception;
 use FML\Controls\Frame;
 use FML\Controls\Labels\Label_Text;
-use FML\Controls\Quad;
 use FML\ManiaLink;
 use ManiaControl\Admin\AuthenticationManager;
 use ManiaControl\Callbacks\CallbackListener;
@@ -14,7 +13,6 @@ use ManiaControl\Callbacks\CallbackManager;
 use ManiaControl\Callbacks\Structures\Common\StatusCallbackStructure;
 use ManiaControl\Callbacks\Structures\TrackMania\OnScoresStructure;
 use ManiaControl\Callbacks\Structures\TrackMania\OnWayPointEventStructure;
-use ManiaControl\Callbacks\TimerListener;
 use ManiaControl\Commands\CommandListener;
 use ManiaControl\Communication\CommunicationAnswer;
 use ManiaControl\Communication\CommunicationListener;
@@ -36,7 +34,7 @@ use Maniaplanet\DedicatedServer\InvalidArgumentException;
  * @author		Beu (based on MatchPlugin by jonthekiller)
  * @license		http://www.gnu.org/licenses/ GNU General Public License, Version 3
  */
-class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
+class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener, CommandListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
 	const PLUGIN_VERSION									= 1.4;
@@ -44,13 +42,11 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	const PLUGIN_AUTHOR										= 'Beu';
 
 	// Specific const
-	const ACTION_READY										= 'ReadyButton.Action';
 	const DB_MATCHESINDEX									= 'MatchManager_MatchesIndex';
 	const DB_ROUNDSINDEX									= 'MatchManager_RoundsIndex';
 	const DB_ROUNDSDATA										= 'MatchManager_RoundsData';
 	const DB_TEAMSDATA										= 'MatchManager_TeamsData';
 	const MLID_MATCH_PAUSE_WIDGET							= 'Pause Widget';
-	const MLID_MATCH_READY_WIDGET							= 'Ready ButtonWidget';
 
 	// Internal Callback Trigger
 	const CB_MATCHMANAGER_BEGINMAP							= 'MatchManager.BeginMap';
@@ -71,12 +67,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	const SETTING_MATCH_PAUSE_MAXNUMBER						= 'Pause Max per Player';
 	const SETTING_MATCH_PAUSE_POSX							= 'Pause Widget-Position: X';
 	const SETTING_MATCH_PAUSE_POSY							= 'Pause Widget-Position: Y';
-	const SETTING_MATCH_READY_HEIGHT						= 'Ready Button-Size: Height';
-	const SETTING_MATCH_READY_MODE							= 'Ready Button';
-	const SETTING_MATCH_READY_NBPLAYERS						= 'Ready Button-Minimal number of players before start';
-	const SETTING_MATCH_READY_POSX							= 'Ready Button-Position: X';
-	const SETTING_MATCH_READY_POSY							= 'Ready Button-Position: Y';
-	const SETTING_MATCH_READY_WIDTH							= 'Ready Button-Size: Width';
 	const SETTING_MATCH_SHUFFLEMAPS							= 'Randomize map order (shuffle)';
 
 
@@ -306,8 +296,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	private $times					= array();
 	private $nbmaps					= 0;
 	private $nbrounds				= 0;
-	private $playersreadystate		= array();
-	private $nbplayers				= 0;
 	private $nbspectators			= 0;
 	private $currentgmbase			= "";
 	private $currentmap				= null;
@@ -405,12 +393,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_MAXNUMBER, 0, "Number of pause a player can ask during a match");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSX, 0, "Position of the Pause Countdown (on X axis)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSY, 43, "Position of the Pause Countdown (on Y axis)");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_READY_HEIGHT, 6, "Height of the Ready widget");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_READY_MODE, false, "Activate Ready widget");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_READY_NBPLAYERS, 2, "Minimal number of players to start a match if all are ready");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_READY_POSX, 152.5, "Position of the Ready widget (on X axis)");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_READY_POSY, 40, "Position of the Ready widget (on Y axis)");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_READY_WIDTH, 15, "Width of the Ready widget");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SHUFFLEMAPS, true, "Shuffle maps order");
 
 		// Gamemodes Settings
@@ -430,7 +412,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 
 		//Register Player Commands
 		$this->maniaControl->getCommandManager()->registerCommandListener('pause', $this, 'onCommandSetPausePlayer', false, 'Set pause during a match.');
-		$this->maniaControl->getCommandManager()->registerCommandListener('ready', $this, 'onCommandSetReadyPlayer', false, 'Change status to Ready.');
 
 		//Register Callbacks
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
@@ -438,7 +419,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERDISCONNECT, $this, 'handlePlayerDisconnect');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERINFOCHANGED, $this, 'handlePlayerInfoChanged');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_SCORES, $this, 'handleEndRoundCallback');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_STARTROUNDSTART, $this, 'handleBeginRoundCallback');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_WARMUPSTARTROUND, $this, 'handleStartWarmUpCallback');
@@ -453,26 +433,13 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.MatchStart", $this, function () { return new CommunicationAnswer($this->MatchStart()); });
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.MatchStop", $this, function () { return new CommunicationAnswer($this->MatchStop()); });
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.GetMatchOptions", $this, function () { return new CommunicationAnswer($this->getGMSettings()); });
-
-		// Register Timers
-		$this->maniaControl->getTimerManager()->registerTimerListening($this, 'Periodic5SecondsLoop', 5000);
-
-		// Register ManiaLink Pages
-		$this->maniaControl->getManialinkManager()->registerManialinkPageAnswerListener(self::ACTION_READY, $this, 'handleReady');
-
-		// Init Ready mode
-		$players = $this->maniaControl->getPlayerManager()->getPlayers();
-		foreach ($players as $player) {
-			$this->handlePlayerConnect($player);
-		}
-
 	}
 
 	/**
 	 * @see \ManiaControl\Plugins\Plugin::unload()
 	 */
 	public function unload() {
-		$this->closeReadyWidget();
+		$this->closePauseWidget();
 	}
 
 	/**
@@ -583,10 +550,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		return $this->currentteamsscore;
 	}
 
-	public function getPlayersReadyState() {
-		return $this->playersreadystate;
-	}
-
 	public function getRoundNumber() {
 		return $this->nbrounds;
 	}
@@ -607,12 +570,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	public function updateSettings(Setting $setting = null) {
 
 		if ($setting->belongsToClass($this)) {
-			$players = $this->maniaControl->getPlayerManager()->getPlayers();
-
-			foreach ($players as $player) {
-				$this->displayReadyWidget($player->login);
-			}
-
 			if ($this->matchStarted) {
 				if ($setting->setting == self::SETTING_MATCH_GAMEMODE_BASE && $setting->value != $this->currentgmbase) {
 					$setting->value = $this->currentgmbase; 
@@ -835,11 +792,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			// Teams Specifics variables
 			$this->currentteamsscore = [];
 
-			$players = $this->maniaControl->getPlayerManager()->getPlayers();
-			foreach ($players as $player) {
-				$this->handlePlayerConnect($player);
-			}
-
 		} catch (Exception $e) {
 			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Can not finish match: ' . $e->getMessage());
 		}
@@ -869,11 +821,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			$this->mapsshuffled		= false;
 			$this->postmatch		= true;
 			$this->matchid			= "";
-
-			$players = $this->maniaControl->getPlayerManager()->getPlayers();
-			foreach ($players as $player) {
-				$this->handlePlayerConnect($player);
-			}
 
 		} catch (Exception $e) {
 			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Can not stop match: ' . $e->getMessage());
@@ -1033,56 +980,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	}
 
 	/**
-	 * Display (or not) the Ready Widget
-	 *
-	 * @param string $login
-	 */
-	public function displayReadyWidget($login) {
-		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_MODE) && (!$this->matchStarted)) {
-			$posX			= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_POSX);
-			$posY			= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_POSY);
-			$width			= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_WIDTH);
-			$height			= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_HEIGHT);
-			$quadStyle		= $this->maniaControl->getManialinkManager()->getStyleManager()->getDefaultQuadStyle();
-			$quadSubstyle	= $this->maniaControl->getManialinkManager()->getStyleManager()->getDefaultQuadSubstyle();
-
-			$maniaLink = new ManiaLink(self::MLID_MATCH_READY_WIDGET);
-
-			// mainframe
-			$frame = new Frame();
-			$maniaLink->addChild($frame);
-			$frame->setSize($width, $height);
-			$frame->setPosition($posX, $posY);
-
-			// Background Quad
-			$backgroundQuad = new Quad();
-			$frame->addChild($backgroundQuad);
-			$backgroundQuad->setSize($width, $height);
-			$backgroundQuad->setStyles($quadStyle, $quadSubstyle);
-			$backgroundQuad->setAction(self::ACTION_READY);
-
-			$label = new Label_Text();
-			$frame->addChild($label);
-			$label->setPosition(0, 1.5, 0.2);
-			$label->setVerticalAlign($label::TOP);
-			$label->setTextSize(2);
-
-			if ($this->playersreadystate[$login] == 1) {
-				$label->setTextColor('0f0');
-			} else {
-				$label->setTextColor('f00');
-			}
-			$label->setText("Ready?");
-
-			// Send manialink
-			$this->maniaControl->getManialinkManager()->sendManialink($maniaLink, $login);
-		} else {
-			$this->playersreadystate[$login] = 0;
-			$this->closeReadyWidget($login);
-		}
-	}
-
-	/**
 	 * Display Pause Widget
 	 *
 	 * @param integer $numberpause
@@ -1142,56 +1039,11 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	}
 
 	/**
-	 * Close Ready Widget
-	 *
-	 * @param string $login
-	 */
-	public function closeReadyWidget($login = null) {
-		$this->maniaControl->getManialinkManager()->hideManialink(self::MLID_MATCH_READY_WIDGET, $login);
-	}
-
-	/**
-	 * Run this function every 5 seconds. Used to start a match with Ready button
-	 */
-	public function Periodic5SecondsLoop() {
-		if (!$this->matchStarted) {
-			if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_MODE)) {
-				$nbplayers = $this->maniaControl->getPlayerManager()->getPlayerCount();
-				if ($nbplayers >= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_NBPLAYERS)) {
-					$nbready = 0;
-					foreach ($this->playersreadystate as $readystate) {
-						if ($readystate == 1) {
-							$nbready++;
-						}
-					}
-					if ($nbready >= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_NBPLAYERS)) {
-						$players = $this->maniaControl->getPlayerManager()->getPlayers();
-						foreach ($players as $player) {
-							$this->playersreadystate[$player->login] = 0;
-						}
-						Logger::log('Start Match via Ready Button');
-						$this->MatchStart();
-					}
-				}
-			}
-		}
-	}
-
-	/**
 	 * Handle when a player connect
 	 *
 	 * @param \ManiaControl\Players\Player $player
 	 */
 	public function handlePlayerConnect(Player $player) {
-		if ($player->isSpectator) {
-			$this->playersreadystate[$player->login] = -1;
-			$this->nbspectators++;
-		} else {
-			$this->playersreadystate[$player->login] = 0;
-			$this->nbplayers++;
-			$this->displayReadyWidget($player->login);
-		}
-
 		if ($this->pauseon) {
 			$this->displayPauseWidget($player->login);
 		}
@@ -1209,38 +1061,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	 * @param \ManiaControl\Players\Player $player
 	*/
 	public function handlePlayerDisconnect(Player $player) {
-		$this->playersreadystate[$player->login] = -1;
-		$this->nbplayers--;
-		$this->closeReadyWidget($player->login);
 		$this->closePauseWidget($player->login);
-	}
-
-	/**
-	 * Handle Ready state of the player
-	 * 
-	 * @param array			$callback
-	 * @param \ManiaControl\Players\Player $player
-	*/
-	public function handleReady(array $callback, Player $player) {
-		Logger::log("handleReady");
-		if ($this->playersreadystate[$player->login]) {
-			if ($this->playersreadystate[$player->login] == 0) {
-				$this->playersreadystate[$player->login] = 1;
-				$this->nbplayers++;
-				$this->displayReadyWidget($player->login);
-				$this->maniaControl->getChat()->sendInformation($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> now is $<$z$0f0ready$>');
-			} elseif ($this->playersreadystate[$player->login] == 1) {
-				$this->playersreadystate[$player->login] = 0;
-				$this->nbplayers--;
-				$this->displayReadyWidget($player->login);
-				$this->maniaControl->getChat()->sendInformation($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> now is $<$z$f00not ready$>');
-			}
-		} else {
-			$this->playersreadystate[$player->login] = 1;
-			$this->nbplayers++;
-			$this->displayReadyWidget($player->login);
-			$this->maniaControl->getChat()->sendInformation($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> now is $<$z$0f0ready$>');
-		}
 	}
 
 	/**
@@ -1431,30 +1252,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			$this->times[] = array($player->login, $structure->getRaceTime());
 		}
 
-	}
-
-	/**
-	 * Handle when a player becomes a spectator (or vice versa)
-	 * 
-	 * @param \ManiaControl\Players\Player $player
-	*/
-	public function handlePlayerInfoChanged(Player $player) { //TODO optimize
-		$this->handlePlayerConnect($player);
-		if ($this->playersreadystate[$player->login]) {
-			if ($player->isSpectator) {
-				if ($this->playersreadystate[$player->login] == 1 || $this->playersreadystate[$player->login] == 0) {
-					$this->nbplayers--;
-				}
-				$this->playersreadystate[$player->login] = -1;
-				$this->closeReadyWidget($player->login);
-			} else {
-				if ($this->playersreadystate[$player->login] == -1) {
-					$this->nbplayers++;
-				}
-				$this->playersreadystate[$player->login] = 0;
-				$this->displayReadyWidget($player->login);
-			}
-		}
 	}
 
 	/**
@@ -1830,17 +1627,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		}
 	}
 
-	/**
-	 * Command /ready for players
-	 *
-	 * @param array			$chatCallback
-	 * @param \ManiaControl\Players\Player $player
-	*/
-	public function onCommandSetReadyPlayer(array $chatCallback, Player $player) {
-		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_MODE) && (!$this->matchStarted)) {
-			$this->handleReady($chatCallback, $player);
-		}
-	}
+
 
 	/**
 	 * Command /pause for players
@@ -1867,4 +1654,3 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		}
 	}
 }
-
