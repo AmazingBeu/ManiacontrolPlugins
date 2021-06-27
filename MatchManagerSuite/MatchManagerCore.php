@@ -27,6 +27,7 @@ use ManiaControl\Settings\SettingManager;
 use ManiaControl\Configurator\GameModeSettings;
 use ManiaControl\Utils\Formatter;
 use Maniaplanet\DedicatedServer\InvalidArgumentException;
+use ManiaControl\Callbacks\TimerListener;
 
 /**
  * MatchManager Core
@@ -34,7 +35,7 @@ use Maniaplanet\DedicatedServer\InvalidArgumentException;
  * @author		Beu (based on MatchPlugin by jonthekiller)
  * @license		http://www.gnu.org/licenses/ GNU General Public License, Version 3
  */
-class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener, CommandListener, CommunicationListener, Plugin {
+class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
 	const PLUGIN_VERSION									= 1.4;
@@ -64,7 +65,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	const SETTING_MATCH_MATCHSETTINGS_CONF					= 'Match settings from matchsettings file only:';
 	const SETTING_MATCH_GAMEMODE_AFTERMATCH					= 'Gamemode used after match:';
 	const SETTING_MATCH_PAUSE_DURATION						= 'Default Pause Duration in seconds';
-	const SETTING_MATCH_PAUSE_MAXNUMBER						= 'Pause Max per Player';
 	const SETTING_MATCH_PAUSE_POSX							= 'Pause Widget-Position: X';
 	const SETTING_MATCH_PAUSE_POSY							= 'Pause Widget-Position: Y';
 	const SETTING_MATCH_SHUFFLEMAPS							= 'Randomize map order (shuffle)';
@@ -293,7 +293,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl			= null;
 	private $chatprefix				= '$<$fc3$w🏆$m$> '; // Would like to create a setting but MC database doesn't support utf8mb4
-	private $times					= array();
 	private $nbmaps					= 0;
 	private $nbrounds				= 0;
 	private $nbspectators			= 0;
@@ -316,10 +315,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	private $currentteamsscore		= array();
 	private $playerpause			= array();
 	private $pausetimer				= 0;
-	private $pauseasked				= false;
 	private $pauseon				= false;
-	private $pauseaskedbyplayer		= "";
-	private $numberpause			= 0;
 
 	private $skipround				= false;
 
@@ -390,7 +386,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_MAPLIST, "match.txt", "Maps + Matchsettings file to load (empty to use server login)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_MATCHSETTINGS_CONF, false, "Load configuration from matchsettings file instead of Admin Interface (can be usefull with a custom script)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_DURATION, 120, "Default Pause Duration in seconds");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_MAXNUMBER, 0, "Number of pause a player can ask during a match");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSX, 0, "Position of the Pause Countdown (on X axis)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSY, 43, "Position of the Pause Countdown (on Y axis)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SHUFFLEMAPS, true, "Shuffle maps order");
@@ -409,9 +404,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		$this->maniaControl->getCommandManager()->registerCommandListener('matchsetpoints', $this, 'onCommandSetPoints', true, 'Sets points to a player.');
 		$this->maniaControl->getCommandManager()->registerCommandListener(array('matchpause','pause'), $this, 'onCommandSetPause', true, 'Set pause during a match. [time] in seconds can be added to force another value');
 		$this->maniaControl->getCommandManager()->registerCommandListener(array('matchendpause','endpause'), $this, 'onCommandUnsetPause', true, 'End the pause during a match.');
-
-		//Register Player Commands
-		$this->maniaControl->getCommandManager()->registerCommandListener('pause', $this, 'onCommandSetPausePlayer', false, 'Set pause during a match.');
 
 		//Register Callbacks
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
@@ -560,6 +552,10 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 
 	public function getNbWinners() {
 		return $this->settings_nbwinners;
+	}
+
+	public function getPauseStatus() {
+		return $this->pauseon;
 	}
 
 	/**
@@ -716,15 +712,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		foreach ($players as $player) {
 			$this->handlePlayerConnect($player);
 		}
-
-		//Reset Player Pause counter
-		foreach ($players as $player) {
-			if (!$player->isSpectator) {
-				$this->playerpause[$player->login] = 0;
-			}
-		}
-		$this->pauseasked	 = false;
-		$this->pauseaskedbyplayer = "";
 
 		// MYSQL DATA INSERT
 		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
@@ -938,7 +925,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	 * @param boolean $admin 
 	 * @param integer $time
 	 */
-	private function setNadeoPause($admin = false, $time = null) {
+	public function setNadeoPause($admin = false, $time = null) {
 		Logger::log("Nadeo Pause");
 
 		if ($time === null) {
@@ -947,24 +934,16 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			$this->pausetimer = $time;
 		}
 
-		$this->numberpause++;
-		$numberpause	= $this->numberpause;
-		$this->pauseon	= true;
+		$this->pauseon = true;
 
 		$this->maniaControl->getModeScriptEventManager()->startPause();
 		$this->maniaControl->getChat()->sendSuccessToAdmins($this->chatprefix . 'You can interrupt the pause with the command //matchendpause');
 
-
 		if ($this->pausetimer > 0) {
-				$this->maniaControl->getTimerManager()->registerOneTimeListening($this, function () use (&$numberpause) {
-
-				if ($numberpause == $this->numberpause) {
-					$this->unsetNadeoPause();
-				} else {
-					Logger::log("Pause not stopped because another is in progress!");
-				}
+			$this->displayPauseWidget();
+			$this->maniaControl->getTimerManager()->registerOneTimeListening($this, function () {
+				$this->unsetNadeoPause();
 			}, $this->pausetimer * 1000);
-			$this->displayPauseWidget($numberpause);
 		}
 	}
 
@@ -975,6 +954,8 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		if ($this->pauseon) {
 			Logger::log("End Pause");
 			$this->closePauseWidget();
+			$this->pauseon = false;
+			$this->skipround = true;
 			$this->maniaControl->getModeScriptEventManager()->endPause();			
 		}
 	}
@@ -982,9 +963,8 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	/**
 	 * Display Pause Widget
 	 *
-	 * @param integer $numberpause
 	 */
-	public function displayPauseWidget($numberpause) {
+	public function displayPauseWidget() {
 		$posX = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_PAUSE_POSX);
 		$posY = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_PAUSE_POSY);
 
@@ -1017,14 +997,12 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		// Send manialink
 		$this->maniaControl->getManialinkManager()->sendManialink($maniaLink);
 
-		$this->maniaControl->getTimerManager()->registerOneTimeListening($this, function () use (&$numberpause) {
-			if ($numberpause == $this->numberpause) {
-				if ($this->pausetimer > 0 && $this->pauseon) {
-					$this->pausetimer--;
-					$this->displayPauseWidget($numberpause);
-				} else {
-					$this->closePauseWidget();
-				}
+		$this->maniaControl->getTimerManager()->registerOneTimeListening($this, function () {
+			if ($this->pausetimer > 0 && $this->pauseon) {
+				$this->pausetimer--;
+				$this->displayPauseWidget();
+			} else {
+				$this->closePauseWidget();
 			}
 		}, 1000);
 	}
@@ -1046,12 +1024,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	public function handlePlayerConnect(Player $player) {
 		if ($this->pauseon) {
 			$this->displayPauseWidget($player->login);
-		}
-
-		if ($this->matchStarted) {
-			if (!isset($this->playerpause[$player->login])) {
-				$this->playerpause[$player->login] = 0;
-			}
 		}
 	}
 
@@ -1197,13 +1169,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	 */
 	public function handleBeginRoundCallback() {
 		Logger::log("handleBeginRoundCallback");
-		$this->times	 = array();
-
-		if ($this->pauseasked) {
-			$this->pauseasked = false;
-			Logger::log("Set Pause");
-			$this->setNadeoPause();
-		}
 
 		if ($this->matchStarted && $this->nbmaps > 0) {
 			if (in_array($this->currentgmbase, ["Cup", "Teams", "Rounds"])) {
@@ -1212,9 +1177,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 						$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'The match is currently on $<$F00pause$>!');
 						Logger::log("Pause");
 					} else {
-						if ($this->pauseon) {
-							$this->pauseon = false;
-						}
 						$this->maniaControl->getChat()->sendInformation($this->chatprefix . '$o$iRound: ' . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
 						Logger::log("Round: " . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
 					}
@@ -1249,7 +1211,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			if (!$player) {
 				return;
 			}
-			$this->times[] = array($player->login, $structure->getRaceTime());
 		}
 
 	}
@@ -1330,8 +1291,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 							}
 							$rank++;
 						}
-
-						Logger::log('Count number of players finish: '. count($this->times));
 
 						if (!$this->pauseon && !$this->skipround) {
 							$this->nbrounds++;
@@ -1624,33 +1583,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			}
 		} else {
 			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Missing or invalid parameters', $adminplayer);
-		}
-	}
-
-
-
-	/**
-	 * Command /pause for players
-	 * 
-	 * @param OnScoresStructure $structure
-	 */
-	public function onCommandSetPausePlayer(array $chatCallback, Player $player) {
-		if (($this->matchStarted) && ($this->currentgmbase != "TimeAttack" || !empty($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE))) && (!$player->isSpectator && !$player->isPureSpectator)) {
-			if ($this->playerpause[$player->login] < $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_PAUSE_MAXNUMBER)) {
-				if ($this->pauseasked === false && $this->pauseon === false) {
-					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> ask for a break of ' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_PAUSE_DURATION) . ' seconds! It will start after this round.');
-					$this->playerpause[$player->login] = $this->playerpause[$player->login] + 1;
-					Logger::log($this->playerpause[$player->login] . " pause for " . $player->login);
-					$this->pauseasked	 = true;
-					$this->pauseaskedbyplayer = $player->login;
-				} else {
-					$this->maniaControl->getChat()->sendError($this->chatprefix . 'Pause already asked by a player!', $player);
-				}
-			} else {
-				$this->maniaControl->getChat()->sendError($this->chatprefix . 'Pause not available, too many pause asked', $player);
-			}
-		} else {
-			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Pause not available (TA or you are spectator)', $player);
 		}
 	}
 }
