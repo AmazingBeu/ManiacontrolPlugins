@@ -18,7 +18,6 @@ use ManiaControl\Players\PlayerManager;
 use ManiaControl\Plugins\Plugin;
 use ManiaControl\Settings\Setting;
 use ManiaControl\Settings\SettingManager;
-//use ManiaControl\Utils\Formatter;
 use ManiaControl\Commands\CommandListener;
 
 
@@ -40,7 +39,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	/*
 	 * Constants
 	 */
-	const PLUGIN_ID											= 199;
+	const PLUGIN_ID											= 158;
 	const PLUGIN_VERSION									= 1.0;
 	const PLUGIN_NAME										= 'MatchManager Ready Button';
 	const PLUGIN_AUTHOR										= 'Beu';
@@ -50,10 +49,10 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 
 	const ACTION_READY										= 'ReadyButton.Action';
 	const MLID_MATCH_READY_WIDGET							= 'Ready ButtonWidget';
-	const SETTING_MATCH_READY_MODE							= 'Ready Button';
-	const SETTING_MATCH_READY_NBPLAYERS						= 'Ready Button-Minimal number of players before start';
-	const SETTING_MATCH_READY_POSX							= 'Ready Button-Position: X';
-	const SETTING_MATCH_READY_POSY							= 'Ready Button-Position: Y';
+	const SETTING_MATCH_READY_MODE							= 'Enable plugin';
+	const SETTING_MATCH_READY_NBPLAYERS						= 'Minimal number of players before start';
+	const SETTING_MATCH_READY_POSX							= 'Position: X';
+	const SETTING_MATCH_READY_POSY							= 'Position: Y';
 
 	/*
 	 * Private properties
@@ -107,7 +106,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 * @see \ManiaControl\Plugins\Plugin::getDescription()
 	 */
 	public static function getDescription() {
-		return 'Add a button for players to get ready and start the game automatically';
+		return 'Add a button for players to get ready and start the match automatically';
 	}
 
 	/**
@@ -352,5 +351,3 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 		$this->MLisNotReady = $MLisNotReady;
 	}
 }
-
-

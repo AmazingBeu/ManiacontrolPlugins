@@ -39,7 +39,7 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	/*
 	 * Constants
 	 */
-	const PLUGIN_ID											= 200;
+	const PLUGIN_ID											= 159;
 	const PLUGIN_VERSION									= 1.0;
 	const PLUGIN_NAME										= 'MatchManager Players Pause';
 	const PLUGIN_AUTHOR										= 'Beu';
@@ -109,7 +109,7 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	 * @see \ManiaControl\Plugins\Plugin::getDescription()
 	 */
 	public static function getDescription() {
-		return 'Add a button for players to get pause and start the game automatically';
+		return 'Add a button for players to launch a pause if needed';
 	}
 
 	/**
@@ -372,4 +372,3 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 		$this->MLPauseNotAsked = $MLPauseNotAsked;
 	}
 }
-
