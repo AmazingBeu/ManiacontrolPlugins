@@ -390,10 +390,8 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSY, 43, "Position of the Pause Countdown (on Y axis)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SHUFFLEMAPS, true, "Shuffle maps order");
 
-		// Gamemodes Settings
-		foreach (self::GAMEMODES_LIST_SETTINGS as $setting => $n) {
-			$this->maniaControl->getSettingManager()->initSetting($this, $setting, $n['default'], $this->getDescriptionPrefix($setting) . $n['description']);
-		}
+		// Init gamemode settings
+		$this->updateSettings();
 
 		//Register Admin Commands
 		$this->maniaControl->getCommandManager()->registerCommandListener('matchstart', $this, 'onCommandMatchStart', true, 'Start a match');
@@ -424,7 +422,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.GetPlayers", $this, function () { return new CommunicationAnswer($this->getPlayers()); });
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.MatchStart", $this, function () { return new CommunicationAnswer($this->MatchStart()); });
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.MatchStop", $this, function () { return new CommunicationAnswer($this->MatchStop()); });
-		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.GetMatchOptions", $this, function () { return new CommunicationAnswer($this->getGMSettings()); });
+		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.GetMatchOptions", $this, function () { return new CommunicationAnswer($this->getGMSettings($this->currentgmbase)); });
 	}
 
 	/**
@@ -564,8 +562,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	 * @param Setting $setting
 	*/
 	public function updateSettings(Setting $setting = null) {
-
-		if ($setting->belongsToClass($this)) {
+		if (isset($setting) && $setting->belongsToClass($this)) {
 			if ($this->matchStarted) {
 				if ($setting->setting == self::SETTING_MATCH_GAMEMODE_BASE && $setting->value != $this->currentgmbase) {
 					$setting->value = $this->currentgmbase; 
@@ -575,7 +572,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 					if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_MATCHSETTINGS_CONF)) {
 						Logger::log("Load Script Settings");
 						try {
-							$this->maniaControl->getClient()->setModeScriptSettings($this->getGMSettings());
+							$this->maniaControl->getClient()->setModeScriptSettings($this->getGMSettings($this->currentgmbase));
 							Logger::log("Parameters updated");
 							$this->maniaControl->getChat()->sendSuccessToAdmins($this->chatprefix . 'Parameters updated');
 						} catch (InvalidArgumentException $e) {
@@ -589,16 +586,38 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 				}
 			}
 		}
+
+		$allsettings = $this->maniaControl->getSettingManager()->getSettingsByClass($this);
+		$gmsettings = $this->getGMSettings($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE));
+		
+		foreach ($allsettings as $key => $value) {
+			$name = $value->setting;
+			if (substr($name,0, 2) == "S_") {
+				if (isset($gmsettings[$name])) {
+					unset($gmsettings[$name]);
+				} else {
+					$this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+				}
+			}
+		}
+		foreach ($gmsettings as $key => $value) {
+			$this->maniaControl->getSettingManager()->initSetting($this, $key, $value, $this->getDescriptionPrefix($key) . self::GAMEMODES_LIST_SETTINGS[$key]['description']);
+		}
 	}
 
 	/**
 	 * Get Array with all settings of the Gamemode
+	 * 
+	 * @param String $gamemode
 	*/
-	public function getGMSettings() {
+	public function getGMSettings(String $gamemode) {
 		$gamesettings = [];
 		foreach (self::GAMEMODES_LIST_SETTINGS as $gamesetting => $info) {
-			if (in_array('Global', $info['gamemode']) || in_array($this->currentgmbase, $info['gamemode'])) {
+			if (in_array('Global', $info['gamemode']) || in_array($gamemode, $info['gamemode'])) {
 				$value = $this->maniaControl->getSettingManager()->getSettingValue($this, $gamesetting);
+				if ($value == null) {
+					$value = $info['default'];
+				}
 				settype($value, $info['type']);
 				$gamesettings = array_merge($gamesettings , array($gamesetting => $value ));
 			}
@@ -1063,7 +1082,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 
 				if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_MATCHSETTINGS_CONF)) {
 					Logger::log("Load Script Settings");
-					$this->maniaControl->getClient()->setModeScriptSettings($this->getGMSettings());
+					$this->maniaControl->getClient()->setModeScriptSettings($this->getGMSettings($this->currentgmbase));
 				}
 
 				$this->updateGMvariables();
@@ -1586,3 +1605,4 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		}
 	}
 }
+
