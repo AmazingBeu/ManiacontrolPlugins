@@ -28,6 +28,7 @@ use ManiaControl\Configurator\GameModeSettings;
 use ManiaControl\Utils\Formatter;
 use Maniaplanet\DedicatedServer\InvalidArgumentException;
 use ManiaControl\Callbacks\TimerListener;
+use ManiaControl\Maps\Map;
 
 /**
  * MatchManager Core
@@ -60,15 +61,16 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	const SETTING_MATCH_AUTHLEVEL							= 'Auth level for the match* commands:';
 	const SETTING_MATCH_CUSTOM_GAMEMODE						= 'Custom Gamemode file';
 	const SETTING_MATCH_GAMEMODE_BASE						= 'Gamemode used during match:';
-	const SETTING_MATCH_LOAD_MAPLIST_FILE					= 'Load maps from maplist file';
-	const SETTING_MATCH_MAPLIST								= 'Maplist to use';
-	const SETTING_MATCH_MATCHSETTINGS_CONF					= 'Match settings from matchsettings file only:';
-	const SETTING_MATCH_GAMEMODE_AFTERMATCH					= 'Gamemode used after match:';
 	const SETTING_MATCH_PAUSE_DURATION						= 'Default Pause Duration in seconds';
 	const SETTING_MATCH_PAUSE_POSX							= 'Pause Widget-Position: X';
 	const SETTING_MATCH_PAUSE_POSY							= 'Pause Widget-Position: Y';
-	const SETTING_MATCH_SHUFFLEMAPS							= 'Randomize map order (shuffle)';
 
+	const SETTING_MATCH_SETTINGS_MODE						= 'Loading mode for settings and maps';
+
+	const SETTING_MODE_MAPS									= 'Maps to play';
+	const SETTING_MODE_SHUFFLE								= 'Randomize map order (shuffle)';
+	const SETTING_MODE_HIDENEXTMAPS							= 'Mask the next maps during the match';
+	const SETTING_MODE_MAPLIST_FILE							= 'Maplist to use';
 
 	// Gamemodes Settings
 	const SETTING_MATCH_S_BESTLAPBONUSPOINTS				= 'S_BestLapBonusPoints';
@@ -286,6 +288,34 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			'description' => 'Ratio of players who will win points' ]
 	];
 
+	const SETTINGS_MODE_LIST = [
+		self::SETTING_MODE_MAPS => [ 
+			'mode' => ['All from the plugin'],
+			'type' => 'string',
+			'default' => 'Campaigns/Training/Training - 01.Map.Gbx,Campaigns/Training/Training - 02.Map.Gbx',
+			'description' => 'Map files separated by comma' ],
+		self::SETTING_MODE_SHUFFLE => [ 
+			'mode' => ['All from the plugin'],
+			'type' => 'boolean',
+			'default' => false,
+			'description' => 'Shuffle maps order' ],
+		self::SETTING_MODE_HIDENEXTMAPS => [ 
+			'mode' => ['All from the plugin'],
+			'type' => 'boolean',
+			'default' => false,
+			'description' => 'Hide maps to players' ],
+		self::SETTING_MODE_MAPLIST_FILE => [ 
+			'mode' => ['Maps from file & Settings from plugin', 'All from file'],
+			'type' => 'string',
+			'default' => 'match.txt',
+			'description' => 'Maps + Matchsettings file to load (empty to use server login)' ],
+		self::SETTING_MATCH_CUSTOM_GAMEMODE => [ 
+			'mode' => ['All from the plugin', 'Maps from file & Settings from plugin'],
+			'type' => 'string',
+			'default' => '',
+			'description' => 'Load custom gamemode script (some functions can bug, for expert only)' ],
+	];
+
 	/*
 	 * Private properties
 	 */
@@ -297,6 +327,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	private $nbrounds				= 0;
 	private $nbspectators			= 0;
 	private $currentgmbase			= "";
+	private $currentsettingmode		= "";
 	private $currentmap				= null;
 	private $matchrecover			= false;
 	private $pointstorecover		= array();
@@ -322,7 +353,9 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	private $settingsloaded			= false;
 	private $postmatch				= false;
 	private $mapsshuffled			= false;
-	private $currentgmsettings		= [];
+	private $mapshidden				= false;
+	private $maps					= array();
+	private $currentgmsettings		= array();
 
 	private $matchid				= "";
 
@@ -379,18 +412,13 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 
 		//Settings
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_AUTHLEVEL, AuthenticationManager::getPermissionLevelNameArray(AuthenticationManager::AUTH_LEVEL_ADMIN), "Admin level needed to use the plugin");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_CUSTOM_GAMEMODE, "", "Load custom gamemode script (some functions can bug, for expert only)");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_AFTERMATCH, array("TimeAttack"), "Gamemode to launch after the match");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Champion", "Cup", "Knockout", "Laps", "Teams", "TimeAttack", "Rounds"), "Gamemode to launch for the match");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_LOAD_MAPLIST_FILE, false, "Load Maps + Matchsettings from the file (or use the current maplist on the server)");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_MAPLIST, "match.txt", "Maps + Matchsettings file to load (empty to use server login)");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_MATCHSETTINGS_CONF, false, "Load configuration from matchsettings file instead of Admin Interface (can be usefull with a custom script)");
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SETTINGS_MODE, array('All from the plugin', 'Maps from file & Settings from plugin', 'All from file'), "Loading mode for maps and match settings, depending on your needs");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_DURATION, 120, "Default Pause Duration in seconds");
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Champion", "Cup", "Knockout", "Laps", "Teams", "TimeAttack", "Rounds"), "Gamemode to launch for the match");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSX, 0, "Position of the Pause Countdown (on X axis)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSY, 43, "Position of the Pause Countdown (on Y axis)");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SHUFFLEMAPS, true, "Shuffle maps order");
 
-		// Init gamemode settings
+		// Init dynamics settings
 		$this->updateSettings();
 
 		//Register Admin Commands
@@ -414,7 +442,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_WARMUPSTARTROUND, $this, 'handleStartWarmUpCallback');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(CallbackManager::CB_MP_BEGINMATCH, $this, 'handleBeginMatchCallback');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_ONFINISHLINE, $this, 'handleFinishCallback');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(CallbackManager::CB_MP_MAPLISTMODIFIED, $this, 'handleMapListModified');
 
 		// Register Socket commands
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.GetMatchStatus", $this, function () { return new CommunicationAnswer($this->getMatchStatus()); });
@@ -562,47 +589,95 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	 * @param Setting $setting
 	*/
 	public function updateSettings(Setting $setting = null) {
-		if (isset($setting) && $setting->belongsToClass($this)) {
-			if ($this->matchStarted) {
-				if ($setting->setting == self::SETTING_MATCH_GAMEMODE_BASE && $setting->value != $this->currentgmbase) {
-					$setting->value = $this->currentgmbase; 
-					$this->maniaControl->getSettingManager()->saveSetting($setting);
-					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'You can\'t change Gamemode during a Match');
-				} else {
-					if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_MATCHSETTINGS_CONF)) {
-						Logger::log("Load Script Settings");
-						try {
-							$this->maniaControl->getClient()->setModeScriptSettings($this->getGMSettings($this->currentgmbase));
-							Logger::log("Parameters updated");
-							$this->maniaControl->getChat()->sendSuccessToAdmins($this->chatprefix . 'Parameters updated');
-						} catch (InvalidArgumentException $e) {
-							Logger::log("Parameters not updated");
-							$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Parameters not updated');
-						}
-						$this->updateGMvariables();
-					} else {
-						$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Settings are loaded by Matchsettings file only.');
+		if (isset($setting) && $setting->belongsToClass($this) && $this->matchStarted) {
+			if ($setting->setting == self::SETTING_MATCH_GAMEMODE_BASE && $setting->value != $this->currentgmbase) {
+				$setting->value = $this->currentgmbase; 
+				$this->maniaControl->getSettingManager()->saveSetting($setting);
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'You can\'t change Gamemode during a Match');
+			} else if ($setting->setting == self::SETTING_MATCH_SETTINGS_MODE && $setting->value != $this->currentsettingmode) {
+				$setting->value = $this->currentsettingmode;
+				$this->maniaControl->getSettingManager()->saveSetting($setting);
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'You can\'t change the Setting Mode during a Match');
+			} else {
+				if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from file') {
+					Logger::log("Load Script Settings");
+					try {
+						$this->maniaControl->getClient()->setModeScriptSettings($this->getGMSettings($this->currentgmbase));
+						Logger::log("Parameters updated");
+						$this->maniaControl->getChat()->sendSuccessToAdmins($this->chatprefix . 'Parameters updated');
+					} catch (InvalidArgumentException $e) {
+						Logger::log("Parameters not updated");
+						$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Parameters not updated');
 					}
+					$this->updateGMvariables();
+				} else {
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Settings are loaded by Matchsettings file only.');
 				}
 			}
 		}
 
 		$allsettings = $this->maniaControl->getSettingManager()->getSettingsByClass($this);
-		$gmsettings = $this->getGMSettings($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE));
-		
+		$settingsmode = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE);
+		$modesettings = $this->getModeSettings($settingsmode);
+
 		foreach ($allsettings as $key => $value) {
 			$name = $value->setting;
-			if (substr($name,0, 2) == "S_") {
-				if (isset($gmsettings[$name])) {
-					unset($gmsettings[$name]);
+			if (array_key_exists($name,self::SETTINGS_MODE_LIST)) {
+				if (isset($modesettings[$name])) {
+					unset($modesettings[$name]);
 				} else {
 					$this->maniaControl->getSettingManager()->deleteSetting($this, $name);
 				}
 			}
 		}
-		foreach ($gmsettings as $key => $value) {
-			$this->maniaControl->getSettingManager()->initSetting($this, $key, $value, $this->getDescriptionPrefix($key) . self::GAMEMODES_LIST_SETTINGS[$key]['description']);
+		foreach ($modesettings as $key => $value) {
+			$this->maniaControl->getSettingManager()->initSetting($this, $key, $value, self::SETTINGS_MODE_LIST[$key]['description']);
 		}
+
+		
+		if ($settingsmode == 'Maps from file & Settings from plugin' || $settingsmode == 'All from the plugin') {
+			$gmsettings = $this->getGMSettings($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE));
+		
+			foreach ($allsettings as $key => $value) {
+				$name = $value->setting;
+				if (substr($name,0, 2) == "S_") {
+					if (isset($gmsettings[$name])) {
+						unset($gmsettings[$name]);
+					} else {
+						$this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+					}
+				}
+			}
+			foreach ($gmsettings as $key => $value) {
+				$this->maniaControl->getSettingManager()->initSetting($this, $key, $value, $this->getDescriptionPrefix($key) . self::GAMEMODES_LIST_SETTINGS[$key]['description']);
+			}
+		} else {
+			foreach ($allsettings as $key => $value) {
+				$name = $value->setting;
+				if (substr($name,0, 2) == "S_") {
+					$this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+				}
+			}
+		}
+	}
+
+
+	/**
+	 * Reset match variables
+	 *
+	 * @param Setting $setting
+	*/
+	public function resetMatchVariables() {
+		$this->matchStarted		= false;
+		$this->matchrecover		= false;
+		$this->pointstorecover	= array();
+		$this->currentscore		= array();
+		$this->settingsloaded	= false;
+		$this->mapsshuffled		= false;
+		$this->mapshidden		= false;
+		$this->maps				= array();
+		$this->postmatch		= true;
+		$this->matchid			= "";
 	}
 
 	/**
@@ -623,6 +698,26 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			}
 		}
 		return $gamesettings;
+	}
+
+	/**
+	 * Get Array with all settings of the Gamemode
+	 * 
+	 * @param String $gamemode
+	*/
+	public function getModeSettings(String $mode) {
+		$modesettings = [];
+		foreach (self::SETTINGS_MODE_LIST as $setting => $info) {
+			if (in_array('Global', $info['mode']) || in_array($mode, $info['mode'])) {
+				$value = $this->maniaControl->getSettingManager()->getSettingValue($this, $setting);
+				if ($value == null) {
+					$value = $info['default'];
+				}
+				settype($value, $info['type']);
+				$modesettings = array_merge($modesettings , array($setting => $value ));
+			}
+		}
+		return $modesettings;
 	}
 
 	/**
@@ -676,93 +771,127 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	 * Function called to start the match
 	 */
 	public function MatchStart() {
-		$this->matchid = $this->maniaControl->getServer()->login . "-" . time();
-		$this->currentgmbase = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE);
-		$maplist = "";
-
-		if (empty($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE))) {
-			$scriptName = "Trackmania/TM_" ;
-			$scriptName .= $this->currentgmbase;
-			$scriptName .= "_Online.Script.txt";
-			$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Match start in ' . $this->currentgmbase . ' mode!');
-		} else {
-			$scriptName = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE);
-			$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Match start with script ' . $scriptName . ' (based on ' . $this->currentgmbase . ')');
-
-		}
-
-		Logger::log("Match start with script " . $scriptName . '!');
-
-		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_LOAD_MAPLIST_FILE)) {
-			Logger::log("Loading maplist + matchsettings");
-			if (empty($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_MAPLIST))) {
-				$server = $this->maniaControl->getServer()->login;
-				$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $server . ".txt";
+		try {
+			$this->matchid = $this->maniaControl->getServer()->login . "-" . time();
+			$this->currentgmbase = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE);
+			$this->currentsettingmode = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE);
+			$maplist = "";
+	
+			if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from the plugin') {
+				Logger::log("Loading maplist + matchsettings");
+				$maplist = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MODE_MAPLIST_FILE);
+				if (empty($maplist)) {
+					$server = $this->maniaControl->getServer()->login;
+					$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $server . ".txt";
+				} else {
+					$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $maplist;
+				}
+				Logger::log("Load matchsettings: " . $maplist);
+				if (!is_file($this->maniaControl->getServer()->getDirectory()->getMapsFolder() . $maplist)) {
+					throw new \Exception("The Maplist file is not accessible or does not exist (the match has not started)");
+				}
+				$this->maniaControl->getClient()->loadMatchSettings($maplist);	
 			} else {
-				$maplist = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_MAPLIST);
-				$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $maplist;
+				if (strlen($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MODE_MAPS)) >= 1) {
+					$maps = explode(',', $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MODE_MAPS));
+	
+					foreach ($maps as $map) {
+						try {
+							$mapInfo = new Map($this->maniaControl->getClient()->getMapInfo($map));
+						} catch (Exception $e) {
+							throw new \Exception("Error with the map " . $map . ": " . $e->getMessage());
+						}
+					}
+	
+					if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MODE_SHUFFLE)) {
+						//shuffle
+						$this->mapsshuffled = true;
+						shuffle($maps);
+					}
+
+					//Remove all maps
+					foreach ($this->maniaControl->getMapManager()->getMaps() as $map) {
+						$this->maniaControl->getClient()->removeMap($map->fileName);
+					}
+
+					$this->maps = $maps;
+					if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MODE_HIDENEXTMAPS)) {
+						$this->maniaControl->getClient()->addMap($this->maps[0]);
+					} else {
+						foreach ($this->maps as $map) {
+							$this->maniaControl->getClient()->addMap($map);
+						}
+					}
+				} else {
+					throw new \Exception("No maps defined (the match has not started)");
+				}
 			}
-			Logger::log("Load matchsettings: " . $maplist);
-			if (!is_file($this->maniaControl->getServer()->getDirectory()->getMapsFolder() . $maplist)) {
-				Logger::log("The Maplist file is not accessible or does not exist (the match has not started)");
-				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "The Maplist file is not accessible or does not exist (the match has not started)");
-				return;
-			}
-			$this->maniaControl->getClient()->loadMatchSettings($maplist);
+
 			Logger::log("Restructure maplist");
 			$this->maniaControl->getMapManager()->restructureMapList();
-		} else {
-			if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_MATCHSETTINGS_CONF)) {
-				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'FYI, No Settings will be load, check "' . self::SETTING_MATCH_MATCHSETTINGS_CONF . "\" and \"" . self::SETTING_MATCH_MAPLIST . "\"");
+
+			if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from file') {
+				if (empty($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE))) {
+					$scriptName = "Trackmania/TM_" ;
+					$scriptName .= $this->currentgmbase;
+					$scriptName .= "_Online.Script.txt";
+					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Match start in ' . $this->currentgmbase . ' mode!');
+				} else {
+					$scriptName = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE);
+					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Match start with script ' . $scriptName . ' (based on ' . $this->currentgmbase . ')');
+				}
+
+				Logger::log("Match start with script " . $scriptName . '!');
+				$this->maniaControl->getClient()->setScriptName($scriptName);
 			}
+
+			$this->matchStarted = true;
+			$this->nbmaps		= 0;
+			$this->nbrounds		= 0;
+
+			Logger::log("Get Players");
+			$players = $this->maniaControl->getPlayerManager()->getPlayers();
+
+			Logger::log("Player State");
+			foreach ($players as $player) {
+				$this->handlePlayerConnect($player);
+			}
+
+			// MYSQL DATA INSERT
+			$mysqli = $this->maniaControl->getDatabase()->getMysqli();
+			$query = 'INSERT INTO `' . self::DB_MATCHESINDEX . '`
+				(`matchid`, `server`, `gamemodebase`, `started`, `ended`)
+				VALUES
+				("' . $this->matchid . '","' . $this->maniaControl->getServer()->login . '","' . $this->currentgmbase . '","' . time() . '","0" )';
+			$mysqli->query($query);
+			if ($mysqli->error) {
+				throw new \Exception("Error during the MySQL insert: " . $mysqli->error);
+			}
+
+			// Trigger Callback
+			$settings = [
+				'currentgmbase' => $this->currentgmbase,
+				'scriptName'	=> $scriptName,
+				'maplist'		=> $maplist,
+				'mapsshuffled'	=> $this->mapsshuffled,
+				'mapshidden'	=> $this->mapshidden,
+				'maps'			=> $this->maps];
+			$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_STARTMATCH, $this->matchid, $settings);
+
+			Logger::log("Skip map");
+			$this->maniaControl->getMapManager()->getMapActions()->skipMap();
+		} catch (Exception $e) {
+			$this->resetMatchVariables();
+			Logger::log($e->getMessage());
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . $e->getMessage());
 		}
-
-		Logger::log("Load Script");
-		$this->maniaControl->getClient()->setScriptName($scriptName);
-
-		$this->matchStarted = true;
-		$this->nbmaps		= 0;
-		$this->nbrounds		= 0;
-
-		Logger::log("Get Players");
-		$players = $this->maniaControl->getPlayerManager()->getPlayers();
-
-		Logger::log("Player State");
-		foreach ($players as $player) {
-			$this->handlePlayerConnect($player);
-		}
-
-		// MYSQL DATA INSERT
-		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-		$query = 'INSERT INTO `' . self::DB_MATCHESINDEX . '`
-			(`matchid`, `server`, `gamemodebase`, `started`, `ended`)
-			VALUES
-			("' . $this->matchid . '","' . $this->maniaControl->getServer()->login . '","' . $this->currentgmbase . '","' . time() . '","0" )';
-		$mysqli->query($query);
-		if ($mysqli->error) {
-			trigger_error($mysqli->error);
-			return false;
-		}
-
-		// Trigger Callback
-		$settings = [
-			'currentgmbase' => $this->currentgmbase,
-			'scriptName'	=> $scriptName,
-			'maplist'		=> $maplist,
-			'mapsshuffled'	=> $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SHUFFLEMAPS)];
-		$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_STARTMATCH, $this->matchid, $settings);
-
-		Logger::log("Skip map");
-		$this->maniaControl->getMapManager()->getMapActions()->skipMap();		
 	}
 
 	/**
 	 * Function called to end the match
 	 */
 	public function MatchEnd() {
-		$scriptName = "Trackmania/TM_" ;
-		$scriptName .= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_AFTERMATCH);
-		$scriptName .= "_Online.Script.txt";
+		$scriptName = "Trackmania/TM_TimeAttack_Online.Script.txt" ;
 
 		try {
 			$this->maniaControl->getClient()->setScriptName($scriptName);
@@ -783,14 +912,8 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			$this->maniaControl->getChat()->sendSuccess($this->chatprefix . "Match finished");
 			Logger::log("Loading script: $scriptName");
 			Logger::log("Match finished");
-			$this->matchStarted		= false;
-			$this->matchrecover		= false;
-			$this->pointstorecover	= array();
-			$this->currentscore		= [];
-			$this->settingsloaded	= false;
-			$this->mapsshuffled		= false;
-			$this->postmatch		= true;
-			$this->matchid			= "";
+
+			$this->resetMatchVariables();
 
 			// KO Specifics variables
 			$this->nbstillalive = 0;
@@ -808,9 +931,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	 */
 	public function MatchStop() {
 		Logger::log("Match stop");
-		$scriptName = "Trackmania/TM_" ;
-		$scriptName .= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_AFTERMATCH);
-		$scriptName .= "_Online.Script.txt";
+		$scriptName = "Trackmania/TM_TimeAttack_Online.Script.txt";
 
 		try {
 			// Trigger Callback
@@ -819,14 +940,8 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Match stopped by an Admin!');
 			$this->maniaControl->getClient()->setScriptName($scriptName);
 			Logger::log("Loading script: $scriptName");
-			$this->matchStarted		= false;
-			$this->matchrecover		= false;
-			$this->pointstorecover	= array();
-			$this->currentscore		= [];
-			$this->settingsloaded	= false;
-			$this->mapsshuffled		= false;
-			$this->postmatch		= true;
-			$this->matchid			= "";
+
+			$this->resetMatchVariables();
 
 		} catch (Exception $e) {
 			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Can not stop match: ' . $e->getMessage());
@@ -1056,18 +1171,6 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 	}
 
 	/**
-	 * Handle callback "MapListModified"
-	 */
-	public function handleMapListModified() {
-		Logger::log("handleMapListModified");
-		if ($this->matchStarted && !$this->mapsshuffled && $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SHUFFLEMAPS)) {
-			Logger::log("Shuffle maplist");
-			$this->maniaControl->getMapManager()->shuffleMapList();
-			$this->mapsshuffled = true;
-		}
-	}
-
-	/**
 	 * Handle callback "BeginMatch"
 	 */
 	public function handleBeginMatchCallback() {
@@ -1075,12 +1178,11 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 
 		if ($this->matchStarted === true) {
 			Logger::log("Check settingsloaded: " . $this->settingsloaded);
-			if (!($this->settingsloaded))
-			{
+			if (!($this->settingsloaded)) {
 				Logger::log("Loading settings");
 				$this->settingsloaded = true;
 
-				if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_MATCHSETTINGS_CONF)) {
+				if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from file') {
 					Logger::log("Load Script Settings");
 					$this->maniaControl->getClient()->setModeScriptSettings($this->getGMSettings($this->currentgmbase));
 				}
@@ -1089,8 +1191,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 
 				Logger::log("Restarting Map for load settings");
 				$this->maniaControl->getClient()->restartMap();
-			}
-			else {
+			} else {
 				$this->nbmaps++;
 				Logger::log('nbmaps: ' . $this->nbmaps);
 
@@ -1347,6 +1448,10 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 
 						Logger::log("Rounds finished: " . $this->nbrounds);
 
+						if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MODE_HIDENEXTMAPS) && $this->nbrounds == $this->settings_nbroundsbymap) {
+							$this->maniaControl->getClient()->addMap($this->maps[$this->nbmaps]);
+						}
+
 						// Trigger Callback
 						$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_ENDROUND, $this->matchid, $this->currentscore, []);
 					}
@@ -1507,7 +1612,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			return;
 		}
 
-		if (($this->matchStarted) && ($this->currentgmbase != "TimeAttack" || !empty($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE)))) {
+		if (($this->matchStarted) && ($this->currentgmbase != "TimeAttack" || ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from file' && !empty($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE))))) {
 			$text = $chatCallback[1][2];
 			$text = explode(" ", $text);
 			if (isset($text[1]) && $text[1] != "") {
@@ -1542,7 +1647,7 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 			$this->maniaControl->getAuthenticationManager()->sendNotAllowed($player);
 			return;
 		}
-		if (($this->matchStarted) && ($this->currentgmbase != "TimeAttack" || !empty($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE))) && $this->pauseon) {
+		if (($this->matchStarted) && ($this->currentgmbase != "TimeAttack" || ( $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from file' && !empty($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE)))) && $this->pauseon) {
 			$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Admin stopped the break');
 			$this->unsetNadeoPause();
 		} else {
@@ -1605,4 +1710,3 @@ class MatchManagerCore implements ManialinkPageAnswerListener, CallbackListener,
 		}
 	}
 }
-
