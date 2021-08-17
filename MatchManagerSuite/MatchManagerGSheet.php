@@ -35,7 +35,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 0.3;
+	const PLUGIN_VERSION									= 0.4;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -131,7 +131,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCHMANAGERGSHEET_CLIENT_SECRET, "", "Used to Authenticate Maniacontrol. See the documentation of the plugin.");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET, "", "Spreadsheet ID from the URL");
 
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCHMANAGERGSHEET_SHEETNAME, "#NAME# Finals", "Variables available: #MATCHID# #NAME# #LOGIN#");
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCHMANAGERGSHEET_SHEETNAME, "#NAME# Finals", "Variables available: #MATCHID# #NAME# #LOGIN# #DATE#");
 
 		$this->maniaControl->getCommandManager()->registerCommandListener('matchgsheet', $this, 'onCommandMatchGSheet', true, 'All MatchManager GSheet plugin commands');
 
@@ -390,6 +390,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 		$sheetname = str_replace("#MATCHID#", $this->matchid, $sheetname);
 		$sheetname = str_replace("#LOGIN#", $login, $sheetname);
 		$sheetname = str_replace("#NAME#", $server_name, $sheetname);
+		$sheetname = str_replace("#DATE#", date("Y-m-d"), $sheetname);
 
 		return $sheetname;
 	}
