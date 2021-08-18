@@ -37,7 +37,7 @@ use ManiaControl\Maps\Map;
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 2.0;
+	const PLUGIN_VERSION									= '2.0.1';
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -604,7 +604,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			}
 		}
 		foreach ($modesettings as $key => $value) {
-			$this->maniaControl->getSettingManager()->initSetting($this, $key, $value, self::SETTINGS_MODE_LIST[$key]['description']);
+			$this->maniaControl->getSettingManager()->initSetting($this, $key, self::SETTINGS_MODE_LIST[$key]['default'], self::SETTINGS_MODE_LIST[$key]['description']);
 		}
 
 		
@@ -618,7 +618,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				}
 			}
 			foreach ($gmsettings as $key => $value) {
-				$this->maniaControl->getSettingManager()->initSetting($this, $key, $value, self::GAMEMODES_LIST_SETTINGS[$key]['description']);
+				$this->maniaControl->getSettingManager()->initSetting($this, $key, self::GAMEMODES_LIST_SETTINGS[$key]['default'], self::GAMEMODES_LIST_SETTINGS[$key]['description']);
 			}
 		} else {
 			foreach ($allsettings as $key => $value) {
