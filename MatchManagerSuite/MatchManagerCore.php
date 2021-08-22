@@ -1376,8 +1376,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 								if ($this->currentgmbase == "Champion") {
 									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, $points , $result->getMapPoints(), $time, "")));
-								} elseif ($this->currentgmbase == "Cup") {	
+								} elseif ($this->currentgmbase == "Cup") {
 									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, ($points + $roundpoints), $roundpoints, $time, "-1")));
+									if ($roundpoints > 0) $atleastonefinished = true; // Round is skipped if no one finishes only in cup mode
 								} elseif ($this->currentgmbase == "Rounds" ) {
 									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, ($points + $roundpoints), $roundpoints, $time, "-1")));
 								} elseif ($this->currentgmbase == "Teams") {
@@ -1403,7 +1404,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						}
 
 						if (!$this->pauseon && !$this->skipround) {
-							$this->nbrounds++;
+							if ($this->currentgmbase != "Cup" || ($this->currentgmbase == "Cup" && isset($atleastonefinished) && $atleastonefinished)) { // Round is skipped if no one finishes only in cup mode
+								$this->nbrounds++;
+							}
 						}
 						if ($this->skipround) {
 							$this->skipround = false;
