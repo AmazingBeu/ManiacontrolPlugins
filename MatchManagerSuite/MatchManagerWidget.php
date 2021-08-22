@@ -42,7 +42,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 * Constants
 	 */
 	const PLUGIN_ID											= 153;
-	const PLUGIN_VERSION									= 1.2;
+	const PLUGIN_VERSION									= 1.3;
 	const PLUGIN_NAME										= 'MatchManager Widget';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -441,6 +441,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 		$listFrame = new Frame();
 		$this->manialinkData->addChild($listFrame);
 		$listFrame->setPosition($posX, $posY);
+		$listFrame->setZ(1);
 
 		$rank = 1;
 
@@ -452,7 +453,11 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 			$points = $score[2];
 			if (isset($pointlimit)) {
 				if ($score[2] > $pointlimit) {
-					$points = '$0f0Winner';
+					if ($score[3] == 0 || $score[2] - $score[3] == $pointlimit) {
+						$points = '$0f0Winner';
+					} else {
+						$points = '$f00Finalist';
+					}
 				} elseif ($score[2] == $pointlimit) {
 					$points = '$f00Finalist';
 				}
@@ -463,6 +468,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 			$recordFrame = new Frame();
 			$listFrame->addChild($recordFrame);
 			$recordFrame->setPosition(0, $y + 2);
+			$recordFrame->setZ(1);
 
 			//Rank
 			$rankLabel = new Label();
@@ -474,6 +480,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 			$rankLabel->setTextPrefix('$o');
 			$rankLabel->setText($rank);
 			$rankLabel->setTextEmboss(true);
+			$rankLabel->setZ(1);
 
 			//Name
 			$nameLabel = new Label();
@@ -483,6 +490,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 			$nameLabel->setSize($width * 0.6, 4);
 			$nameLabel->setTextSize(1);
 			$nameLabel->setTextEmboss(true);
+			$nameLabel->setZ(1);
 
 			//Points
 			$pointsLabel = new Label();
@@ -493,12 +501,14 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 			$pointsLabel->setTextSize(1);
 			$pointsLabel->setText('$z' . $points);
 			$pointsLabel->setTextEmboss(true);
+			$pointsLabel->setZ(1);
 
 			//Background with Spec action
 			$quad = new Quad();
 			$recordFrame->addChild($quad);
 			$quad->setStyles(Quad_Bgs1InRace::STYLE, Quad_Bgs1InRace::SUBSTYLE_BgCardList);
 			$quad->setSize($width-2, 4);
+			$quad->setZ(1);
 
 			if ($this->gmbase == "Teams") {
 				$team = $this->maniaControl->getClient()->getTeamInfo($score[1] + 1);
