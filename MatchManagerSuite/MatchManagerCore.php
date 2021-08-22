@@ -37,7 +37,7 @@ use ManiaControl\Maps\Map;
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 2.2;
+	const PLUGIN_VERSION									= 2.3;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -578,7 +578,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from file') {
 					Logger::log("Load Script Settings");
 					try {
-						$this->maniaControl->getClient()->setModeScriptSettings($this->getGMSettings($this->currentgmbase));
+						$this->loadGMSettings($this->getGMSettings($this->currentgmbase));
 						Logger::log("Parameters updated");
 						$this->maniaControl->getChat()->sendSuccessToAdmins($this->chatprefix . 'Parameters updated');
 					} catch (InvalidArgumentException $e) {
@@ -656,12 +656,32 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	}
 
 	/**
+	 * Load Gamemode settings excluding not used settings in custom gamemodes
+	 * 
+	 * @param array $gmsettings
+	*/
+	private function loadGMSettings($gmsettings) {
+		if (!empty($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE))) {
+			$currentgmsettings = $this->maniaControl->getClient()->getModeScriptSettings();
+
+			foreach ($gmsettings as $setting => $value) {
+				if (!isset($currentgmsettings[$setting])) {
+					unset($gmsettings[$setting]);
+				}
+			}
+		}
+
+		$this->maniaControl->getClient()->setModeScriptSettings($gmsettings);
+	}
+
+	/**
 	 * Get Array with all settings of the Gamemode
 	 * 
 	 * @param String $gamemode
 	*/
 	public function getGMSettings(String $gamemode) {
 		$gamesettings = [];
+
 		foreach (self::GAMEMODES_LIST_SETTINGS as $gamesetting => $info) {
 			if (in_array('Global', $info['gamemode']) || in_array($gamemode, $info['gamemode'])) {
 				$value = $this->maniaControl->getSettingManager()->getSettingValue($this, $gamesetting);
@@ -670,7 +690,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				} else {
 					settype($value, $info['type']);
 				}
-				$gamesettings = array_merge($gamesettings , array($gamesetting => $value ));
+				$gamesettings = array_merge($gamesettings , array($gamesetting => $value));
 			}
 		}
 		return $gamesettings;
@@ -1177,7 +1197,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 				if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from file') {
 					Logger::log("Load Script Settings");
-					$this->maniaControl->getClient()->setModeScriptSettings($this->getGMSettings($this->currentgmbase));
+					$this->loadGMSettings($this->getGMSettings($this->currentgmbase));
 				}
 
 				$this->updateGMvariables();
