@@ -37,7 +37,7 @@ use ManiaControl\Maps\Map;
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 2.3;
+	const PLUGIN_VERSION									= 2.4;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -1190,7 +1190,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		Logger::log("handleBeginMatchCallback");
 
 		if ($this->matchStarted === true) {
-			Logger::log("Check settingsloaded: " . $this->settingsloaded);
 			if (!($this->settingsloaded)) {
 				Logger::log("Loading settings");
 				$this->settingsloaded = true;
@@ -1206,13 +1205,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				$this->maniaControl->getClient()->restartMap();
 			} else {
 				$this->nbmaps++;
-				Logger::log('nbmaps: ' . $this->nbmaps);
-
 				$this->nbrounds = 0;
 
 				if ($this->nbmaps > 0) {
-					Logger::log("Map: " . $this->nbmaps);
-
 					$maps = $this->maniaControl->getMapManager()->getMaps();
 					$totalnbmaps = $this->maniaControl->getMapManager()->getMapsCount();
 					
@@ -1232,9 +1227,23 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 							$i++;
 						}
 	
-						if (($this->settings_nbmapsbymatch > 0 &&  $i < $this->settings_nbmapsbymatch - 1 ) || ($this->settings_nbmapsbymatch <= 0 && $totalnbmaps >= 2)) { // TODO manage maps in queue added by an admin
+						if (($this->settings_nbmapsbymatch > 0 && $i < $this->settings_nbmapsbymatch - 1 && $this->nbmaps < $this->settings_nbmapsbymatch) || ($this->settings_nbmapsbymatch <= 0 && ($totalnbmaps >= 2 || count($this->maps) >= 2))) { // TODO manage maps in queue added by an admin
 							$message = $this->chatprefix . '$<$o$iNext Maps:$>';
-							for ($j = 1; $j <= 4 && (($this->settings_nbmapsbymatch > 0 && $j <= $this->settings_nbmapsbymatch - $this->nbmaps) || ($this->settings_nbmapsbymatch <= 0 && $j <= $totalnbmaps))  ; $j++ ) {
+
+							$nbhiddenmaps = 0;
+							if ($this->hidenextmaps) {
+								if ($totalnbmaps < count($this->maps)) {
+									if ($this->settings_nbmapsbymatch > 0) {
+										$nbhiddenmaps = min(count($this->maps) - $totalnbmaps, $this->settings_nbmapsbymatch - 1);
+									} else {
+										$nbhiddenmaps = count($this->maps) - $totalnbmaps;
+									}
+									$message .= "\nThen " . $nbhiddenmaps . " hidden maps";
+									Logger::log("Then " . $nbhiddenmaps . " hidden maps");
+								}
+							}
+
+							for ($j = 1; $j + $nbhiddenmaps <= 4 && (($this->settings_nbmapsbymatch > 0 && $j + $nbhiddenmaps <= $this->settings_nbmapsbymatch - $this->nbmaps) || ($this->settings_nbmapsbymatch <= 0 && $j + $nbhiddenmaps <= $totalnbmaps))  ; $j++ ) {
 								$index = $i + $j;
 	
 								while ($index >= $totalnbmaps) { // return to the start of the array if end of array
@@ -1247,16 +1256,18 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 								} else {
 									$message .= "\nThen we will return to this map";
 									Logger::log("Then we will return to this map");
+									$j = 0;
 									break;
 								}
 							}
-							if ($j >= 4) {
-								if ($this->settings_nbmapsbymatch > 0 && $this->settings_nbmapsbymatch - $j - $this->nbmaps + 1 > 0) {
-									$message .= "\n" . "And " . ($this->settings_nbmapsbymatch - $j - $this->nbmaps + 1) . " more maps";
-									Logger::log("And " . ($this->settings_nbmapsbymatch - $j - $this->nbmaps + 1) . " more maps");
-								} elseif ($this->settings_nbmapsbymatch <= 0 && $totalnbmaps - $j > 0) {
-									$message .= "\n" . "And " . ($totalnbmaps - $j) . " more maps";
-									Logger::log("And " . ($totalnbmaps - $j) . " more maps");
+							if ($j + $nbhiddenmaps >= 4) {
+								if ($this->settings_nbmapsbymatch > 0 && $this->settings_nbmapsbymatch - $j - $nbhiddenmaps - $this->nbmaps + 1 > 0) {
+									$message .= "\n" . "And " . ($this->settings_nbmapsbymatch - $j - $nbhiddenmaps - $this->nbmaps + 1) . " more maps";
+									Logger::log("And " . ($this->settings_nbmapsbymatch - $j - $nbhiddenmaps - $this->nbmaps + 1) . " more maps");
+								} elseif ($this->settings_nbmapsbymatch <= 0 && ($totalnbmaps - $j - $nbhiddenmaps > 0 || count($this->maps) - $j - $nbhiddenmaps > 0)) {
+									$n = max($totalnbmaps - $j - $nbhiddenmaps, count($this->maps) - $j - $nbhiddenmaps);
+									$message .= "\n" . "And " . $n . " more maps";
+									Logger::log("And " . $n . " more maps");
 								}
 							}
 							$this->maniaControl->getChat()->sendInformation($message);
