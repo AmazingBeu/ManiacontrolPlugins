@@ -37,7 +37,7 @@ use ManiaControl\Maps\Map;
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 2.1;
+	const PLUGIN_VERSION									= 2.2;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -1678,8 +1678,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 				if (isset($array[0])) {
 						$login = $array[0];
-				} elseif (strlen($peopletoadd) == 22) {
-						$login = $peopletoadd ;
+				} elseif (strlen($text[1]) == 22) {
+						$login = $text[1];
 				}
 				if ($mysqli->error) {
 						trigger_error($mysqli->error, E_USER_ERROR);
