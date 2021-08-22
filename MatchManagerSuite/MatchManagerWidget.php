@@ -13,7 +13,6 @@ use ManiaControl\Callbacks\Callbacks;
 use ManiaControl\Callbacks\Structures\Common\BasePlayerTimeStructure;
 use ManiaControl\Callbacks\Structures\TrackMania\OnScoresStructure;
 use ManiaControl\Callbacks\Structures\TrackMania\OnWayPointEventStructure;
-use ManiaControl\Callbacks\TimerListener;
 use ManiaControl\Logger;
 use ManiaControl\ManiaControl;
 use ManiaControl\Manialinks\ManialinkPageAnswerListener;
@@ -38,12 +37,12 @@ use MatchManagerSuite\MatchManagerCore;
  * @author		Beu (based on MatchManagerWidget by jonthekiller)
  * @license		http://www.gnu.org/licenses/ GNU General Public License, Version 3
  */
-class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListener, TimerListener, Plugin {
+class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListener, Plugin {
 	/*
 	 * Constants
 	 */
 	const PLUGIN_ID											= 153;
-	const PLUGIN_VERSION									= 1.1;
+	const PLUGIN_VERSION									= 1.2;
 	const PLUGIN_NAME										= 'MatchManager Widget';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -297,6 +296,8 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 				} else {
 					$players = [];
 					$specs = [];
+					$diffspecs = [];
+					$diffplayers = [];
 
 					if (isset($login)) {
 						$player = $this->maniaControl->getPlayerManager()->getPlayer($login);
@@ -511,5 +512,3 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 		}
 	}
 }
-
-
