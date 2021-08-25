@@ -407,6 +407,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 		$titleLabel->setTextSize(2);
 		$titleLabel->setText('$<$z$i$fc3🏆$> Match Live');
 		$titleLabel->setTranslate(true);
+		$titleLabel->setZ(1);
 
 		$this->manialinkBackground = new ManiaLink(self::MLID_MATCHMANAGERWIDGET_LIVE_WIDGETBACKGROUND);
 		$this->manialinkBackground->addChild($frame);
