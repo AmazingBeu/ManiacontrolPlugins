@@ -42,7 +42,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 * Constants
 	 */
 	const PLUGIN_ID											= 153;
-	const PLUGIN_VERSION									= 1.3;
+	const PLUGIN_VERSION									= 1.4;
 	const PLUGIN_NAME										= 'MatchManager Widget';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -454,11 +454,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 			$points = $score[2];
 			if (isset($pointlimit)) {
 				if ($score[2] > $pointlimit) {
-					if ($score[3] == 0 || $score[2] - $score[3] == $pointlimit) {
-						$points = '$0f0Winner';
-					} else {
-						$points = '$f00Finalist';
-					}
+					$points = '$0f0Winner';
 				} elseif ($score[2] == $pointlimit) {
 					$points = '$f00Finalist';
 				}

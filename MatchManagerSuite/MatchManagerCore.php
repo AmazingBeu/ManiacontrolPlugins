@@ -37,7 +37,7 @@ use ManiaControl\Maps\Map;
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 2.4;
+	const PLUGIN_VERSION									= 2.5;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -337,7 +337,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	private $settings_pointlimit	= 100;
 
 	private $nbwinners				= 0;
-	private $nbstillalive			= 0;
 	private $scriptSettings			= array();
 
 	private $currentscore			= array();
@@ -649,6 +648,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->postmatch		= true;
 		$this->matchid			= "";
 
+		$this->nbwinners 		= 0;
+
 		$this->settings_nbroundsbymap	= 5;
 		$this->settings_nbwinner		= 2;
 		$this->settings_nbmapsbymatch	= 0;
@@ -923,9 +924,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			Logger::log("Match finished");
 
 			$this->resetMatchVariables();
-
-			// KO Specifics variables
-			$this->nbstillalive = 0;
 
 			// Teams Specifics variables
 			$this->currentteamsscore = [];
@@ -1385,12 +1383,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 							usort($results, function ($a, $b) { return -($a->getMatchPoints() + $a->getRoundPoints() <=> $b->getMatchPoints() + $b->getRoundPoints()); });
 						}
 
-						// CUP Specific variables
-						$this->nbwinners = 0;
-
-						// Knockout Specific variables
-						$this->nbstillalive = 0;
-
 						$pointsrepartition = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_S_POINTSREPARTITION);
 						$pointsrepartition = explode(',', $pointsrepartition);
 
@@ -1408,14 +1400,27 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 								if ($this->currentgmbase == "Champion") {
 									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, $points , $result->getMapPoints(), $time, "")));
 								} elseif ($this->currentgmbase == "Cup") {
-									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, ($points + $roundpoints), $roundpoints, $time, "-1")));
+									// Bypass false winner because of the sum of points
+									if ($points + $roundpoints > $this->settings_pointlimit && $roundpoints > 0) {
+										if ($points == $this->settings_pointlimit) { // new winner
+											var_dump("settings_pointlimit: " . $this->settings_pointlimit . " / settings_nbwinners: " . $this->settings_nbwinners . " / nbwinners: " . $this->nbwinners);
+											$matchpoints = $this->settings_pointlimit + 1 + $this->settings_nbwinners - $this->nbwinners;
+											$this->nbwinners++;
+										} else {
+											$matchpoints = $this->settings_pointlimit;
+										}
+										
+									} else {
+										$matchpoints = $points + $roundpoints;
+									}
+									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, $matchpoints, $roundpoints, $time, "-1")));
 									if ($roundpoints > 0) $atleastonefinished = true; // Round is skipped if no one finishes only in cup mode
 								} elseif ($this->currentgmbase == "Rounds" ) {
-									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, ($points + $roundpoints), $roundpoints, $time, "-1")));
+									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, $matchpoints, $roundpoints, $time, "-1")));
 								} elseif ($this->currentgmbase == "Teams") {
 									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, ($points + $roundpoints), $roundpoints, $time, $player->teamId)));
 								} elseif ($this->currentgmbase == "Knockout") {
-									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, $points, "-1", $time, "-1")));
+									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, $points, "-1", $time, "-1"))); //TODO check
 								}
 							} elseif (in_array($this->currentgmbase, ["Laps", "TimeAttack", "RoyalTimeAttack"]) && !(($time == 0 || $time == -1) && ($player->isSpectator || $player->isFakePlayer()))) {
 								$besttime = $result->getBestRaceTime();
