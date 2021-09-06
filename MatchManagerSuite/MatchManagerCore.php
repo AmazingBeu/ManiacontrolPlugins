@@ -37,7 +37,7 @@ use ManiaControl\Maps\Map;
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 2.5;
+	const PLUGIN_VERSION									= 2.6;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -1416,7 +1416,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, $matchpoints, $roundpoints, $time, "-1")));
 									if ($roundpoints > 0) $atleastonefinished = true; // Round is skipped if no one finishes only in cup mode
 								} elseif ($this->currentgmbase == "Rounds" ) {
-									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, $matchpoints, $roundpoints, $time, "-1")));
+									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, ($points + $roundpoints), $roundpoints, $time, "-1")));
 								} elseif ($this->currentgmbase == "Teams") {
 									$this->currentscore = array_merge($this->currentscore, array(array($rank, $player->login, ($points + $roundpoints), $roundpoints, $time, $player->teamId)));
 								} elseif ($this->currentgmbase == "Knockout") {
