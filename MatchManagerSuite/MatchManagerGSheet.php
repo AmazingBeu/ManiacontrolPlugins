@@ -35,7 +35,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 0.4;
+	const PLUGIN_VERSION									= 0.5;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -287,6 +287,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 
 	private function refreshTokenIfNeeded() {
 		Logger::Log('refreshTokenIfNeeded');
+		$this->access_token = $this->getSecretSetting("access_token");
 		$expire = $this->getSecretSetting("expire");
 		$refreshtoken = $this->getSecretSetting("refresh_token");
 		$clientid = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_CLIENT_ID);
