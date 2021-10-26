@@ -84,7 +84,7 @@ class SimpleChatColorer implements CallbackListener, Plugin {
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
 
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_CHATDAMDMINCOLORER_USEADMINCOLOR, true, "Use Admin Color of Maniacontrol settings");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_CHATDAMDMINCOLORER_NUMBEROFGROUPS, 1, "Nomber of groups to setup");
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_CHATDAMDMINCOLORER_NUMBEROFGROUPS, 1, "Number of groups to setup");
 
 		$this->InitGroupsSettings();
 
@@ -174,4 +174,3 @@ class SimpleChatColorer implements CallbackListener, Plugin {
 		$this->maniaControl->getCallbackManager()->unregisterCallbackListening('ManiaPlanet.OnPlayerChat', $this);
 	}
 }
-

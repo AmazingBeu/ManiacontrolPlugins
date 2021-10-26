@@ -14,7 +14,7 @@ use \ManiaControl\Logger;
 /**
  * Plugin Description
  *
- * @author  Template Author
+ * @author  Beu
  * @version 1.0
  */
 class GuestlistManager implements CommandListener, Plugin {
