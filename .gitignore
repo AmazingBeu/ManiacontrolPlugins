@@ -1,1 +1,5 @@
-*.zip
+*
+!README.md
+!docs
+!MatchManagerSuite
+!Beu
