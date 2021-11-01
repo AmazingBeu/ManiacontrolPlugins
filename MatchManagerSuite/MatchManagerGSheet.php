@@ -426,7 +426,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$data->data[2]->values = $currentscore;
 
 			$data->data[3] = new \stdClass;
-			$data->data[3]->range = "'" . $sheetname . "'!K2";
+			$data->data[3]->range = "'" . $sheetname . "'!Q2";
 			$data->data[3]->values = $currentteamsscore;
 
 			$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values:batchUpdate');
@@ -589,7 +589,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$data->requests[$i]->repeatCell->range->startRowIndex = 0;
 			$data->requests[$i]->repeatCell->range->endRowIndex = 1;
 			$data->requests[$i]->repeatCell->range->startColumnIndex = 3;
-			$data->requests[$i]->repeatCell->range->endColumnIndex = 9;
+			$data->requests[$i]->repeatCell->range->endColumnIndex = 15;
 			$data->requests[$i]->repeatCell->cell = new \stdClass;
 			$data->requests[$i]->repeatCell->cell->userEnteredFormat = new \stdClass;
 			$data->requests[$i]->repeatCell->cell->userEnteredFormat->backgroundColor = new \stdClass;
@@ -609,8 +609,8 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$data->requests[$i]->repeatCell->range->sheetId = $sheetid;
 			$data->requests[$i]->repeatCell->range->startRowIndex = 0;
 			$data->requests[$i]->repeatCell->range->endRowIndex = 1;
-			$data->requests[$i]->repeatCell->range->startColumnIndex = 10;
-			$data->requests[$i]->repeatCell->range->endColumnIndex = 14;
+			$data->requests[$i]->repeatCell->range->startColumnIndex = 16;
+			$data->requests[$i]->repeatCell->range->endColumnIndex = 22;
 			$data->requests[$i]->repeatCell->cell = new \stdClass;
 			$data->requests[$i]->repeatCell->cell->userEnteredFormat = new \stdClass;
 			$data->requests[$i]->repeatCell->cell->userEnteredFormat->backgroundColor = new \stdClass;
@@ -633,7 +633,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 					Logger::logError('Error while Sending data: ' . print_r($error, true));
 				}
 				// Clear Scoreboards data
-				$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values/' . urlencode("'". $sheetname . "'") . '!A1:N300:clear');
+				$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values/' . urlencode("'". $sheetname . "'") . '!A1:V300:clear');
 				$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 				$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname) {
 					$data = json_decode($json);
@@ -650,11 +650,11 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 
 					$data->data[1] = new \stdClass;
 					$data->data[1]->range = "'" . $sheetname . "'!D1";
-					$data->data[1]->values = array(array("Rank","Login", "MatchPoints", "RoundPoints","Time","Team"));
+					$data->data[1]->values = array(array("Rank","Login", "MatchPoints", "MapPoints", "RoundPoints","BestRaceTime","BestRaceCheckpoints","BestLaptime","BestLapCheckpoints","PrevRaceTime","PrevRaceCheckpoints","Team"));
 
 					$data->data[2] = new \stdClass;
-					$data->data[2]->range = "'" . $sheetname . "'!K1";
-					$data->data[2]->values = array(array("Rank","Team ID", "Name", "MatchPoints"));
+					$data->data[2]->range = "'" . $sheetname . "'!Q1";
+					$data->data[2]->values = array(array("Rank","Team ID", "Name", "MatchPoints", "MapPoints", "RoundPoints"));
 
 					$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values:batchUpdate');
 					$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);

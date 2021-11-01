@@ -426,11 +426,20 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 			$pointlimit = $this->MatchManagerCore->getMatchPointsLimit();
 		}
 
-		// Sort if possible
-		if (count($currentscore) > 1) {
-			usort($currentscore, function($a, $b) {
-				return $b[2] - $a[2];
-			});
+		if ($this->gmbase == "Teams") {
+			// Sort if possible
+			if (count($currentscore) > 1) {
+				usort($currentscore, function($a, $b) {
+					return $b[3] - $a[3];
+				});
+			}
+		} else {
+			// Sort if possible
+			if (count($currentscore) > 1) {
+				usort($currentscore, function($a, $b) {
+					return $b[2] - $a[2];
+				});
+			}
 		}
 
 		$lines      = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERWIDGET_LIVE_LINESCOUNT);
@@ -451,11 +460,16 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 				break;
 			}
 
-			$points = $score[2];
+			if ($this->gmbase == "Teams") {
+				$points = $score[3];
+			} else {
+				$points = $score[2];
+			}
+
 			if (isset($pointlimit)) {
-				if ($score[2] > $pointlimit) {
+				if ($points > $pointlimit) {
 					$points = '$0f0Winner';
-				} elseif ($score[2] == $pointlimit) {
+				} elseif ($points == $pointlimit) {
 					$points = '$f00Finalist';
 				}
 			}
