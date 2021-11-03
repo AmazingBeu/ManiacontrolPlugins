@@ -35,7 +35,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 0.5;
+	const PLUGIN_VERSION									= 0.6;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -405,10 +405,10 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 
 			$data->data[0] = new \stdClass;
 			$data->data[0]->range = "'" . $sheetname . "'!B2";
-			$data->data[0]->values = array(array($this->matchstatus),array($this->MatchManagerCore->getCountMap()),array($this->MatchManagerCore->getCountRound()));
+			$data->data[0]->values = array(array($this->matchstatus),array($this->MatchManagerCore->getCountMap()),array($this->MatchManagerCore->getCountRound()),array($this->maniaControl->getPlayerManager()->getPlayerCount()),array($this->maniaControl->getPlayerManager()->getSpectatorCount()));
 
 			$data->data[1] = new \stdClass;
-			$data->data[1]->range = "'" . $sheetname . "'!A7";
+			$data->data[1]->range = "'" . $sheetname . "'!A9";
 
 			
 			foreach ($this->maniaControl->getPlayerManager()->getPlayers() as $player) {
@@ -547,7 +547,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$data->requests[$i]->repeatCell->range = new \stdClass;
 			$data->requests[$i]->repeatCell->range->sheetId = $sheetid;
 			$data->requests[$i]->repeatCell->range->startRowIndex = 0;
-			$data->requests[$i]->repeatCell->range->endRowIndex = 4;
+			$data->requests[$i]->repeatCell->range->endRowIndex = 6;
 			$data->requests[$i]->repeatCell->range->startColumnIndex = 0;
 			$data->requests[$i]->repeatCell->range->endColumnIndex = 1;
 			$data->requests[$i]->repeatCell->cell = new \stdClass;
@@ -566,8 +566,8 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$data->requests[$i]->repeatCell = new \stdClass;
 			$data->requests[$i]->repeatCell->range = new \stdClass;
 			$data->requests[$i]->repeatCell->range->sheetId = $sheetid;
-			$data->requests[$i]->repeatCell->range->startRowIndex = 5;
-			$data->requests[$i]->repeatCell->range->endRowIndex = 6;
+			$data->requests[$i]->repeatCell->range->startRowIndex = 7;
+			$data->requests[$i]->repeatCell->range->endRowIndex = 8;
 			$data->requests[$i]->repeatCell->range->startColumnIndex = 0;
 			$data->requests[$i]->repeatCell->range->endColumnIndex = 2;
 			$data->requests[$i]->repeatCell->cell = new \stdClass;
@@ -646,7 +646,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 
 					$data->data[0] = new \stdClass;
 					$data->data[0]->range = "'" . $sheetname . "'!A1";
-					$data->data[0]->values = array(array("Informations"),array("Match status:", $this->matchstatus),array("Maps:","0/0"),array("Rounds:","0/0"),array(),array("Login:","Nickname:"));
+					$data->data[0]->values = array(array("Informations"),array("Match status:", $this->matchstatus),array("Maps:","0/0"),array("Rounds:","0/0"),array("Players:","0"),array("Spectators:","0"),array(),array("Login:","Nickname:"));
 
 					$data->data[1] = new \stdClass;
 					$data->data[1]->range = "'" . $sheetname . "'!D1";
