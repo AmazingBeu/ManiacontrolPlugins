@@ -42,7 +42,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 * Constants
 	 */
 	const PLUGIN_ID											= 153;
-	const PLUGIN_VERSION									= 1.4;
+	const PLUGIN_VERSION									= 1.5;
 	const PLUGIN_NAME										= 'MatchManager Widget';
 	const PLUGIN_AUTHOR										= 'Beu';
 
