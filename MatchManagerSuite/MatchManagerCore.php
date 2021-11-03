@@ -11,6 +11,7 @@ use ManiaControl\Callbacks\CallbackListener;
 use ManiaControl\Callbacks\Callbacks;
 use ManiaControl\Callbacks\CallbackManager;
 use ManiaControl\Callbacks\Structures\Common\StatusCallbackStructure;
+use ManiaControl\Callbacks\Structures\TrackMania\OnPointsRepartitionStructure;
 use ManiaControl\Callbacks\Structures\TrackMania\OnScoresStructure;
 use ManiaControl\Commands\CommandListener;
 use ManiaControl\Communication\CommunicationAnswer;
@@ -37,7 +38,7 @@ use ManiaControl\Maps\Map;
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 2.6;
+	const PLUGIN_VERSION									= 3.0;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -1312,10 +1313,22 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 */
 	public function handleBeginMatchCallback() {
 		Logger::log("handleStartMatchStartCallback");
-
 		if ($this->matchStarted && !$this->settingsloaded) {
 			Logger::log("Restarting map to restart match data");
 			$this->maniaControl->getClient()->restartMap();
+		} else if ($this->matchStarted && $this->settingsloaded && $this->nbrounds == 0) {
+			Logger::Log("Check if Points Repartition need to be re-applied");
+			$this->maniaControl->getModeScriptEventManager()->getTrackmaniaPointsRepartition()->setCallable(function (OnPointsRepartitionStructure $structure) {
+				$currentgmsettings = $this->maniaControl->getClient()->getModeScriptSettings();
+				if (!is_null($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_S_POINTSREPARTITION)) && isset($currentgmsettings[self::SETTING_MATCH_S_POINTSREPARTITION])) {
+					$pointrepartitionarray = explode(",", $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_S_POINTSREPARTITION));
+					if ($structure->getPointsRepartition() != $pointrepartitionarray) {
+						Logger::Log("re-applying Points Repartition for workaround");
+						$newpoints = array(self::SETTING_MATCH_S_POINTSREPARTITION => $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_S_POINTSREPARTITION) . ',' . end($pointrepartitionarray));
+						$this->maniaControl->getClient()->setModeScriptSettings($newpoints);
+					}
+				}
+			});
 		}
 	}
 
@@ -1449,6 +1462,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 */
 	public function handleEndRoundCallback(OnScoresStructure $structure) {
 		Logger::log("handleEndRoundCallback-" . $structure->getSection());
+
 		if ($this->matchStarted && $this->settingsloaded && !$this->postmatch) {
 			Logger::log("Section: " . $structure->getSection());
 			if ($structure->getSection() == "EndMatchEarly") {
