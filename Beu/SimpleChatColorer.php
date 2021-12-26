@@ -7,6 +7,9 @@ use ManiaControl\Plugins\Plugin;
 use \ManiaControl\Logger;
 use ManiaControl\Settings\Setting;
 use ManiaControl\Settings\SettingManager;
+use ManiaControl\Commands\CommandListener;
+use ManiaControl\Players\Player;
+use ManiaControl\Players\PlayerManager;
 
 /**
  * ManiaControl
@@ -14,12 +17,12 @@ use ManiaControl\Settings\SettingManager;
  * @author	Beu
  * @license   http://www.gnu.org/licenses/ GNU General Public License, Version 3
  */
-class SimpleChatColorer implements CallbackListener, Plugin {
+class SimpleChatColorer implements CommandListener, CallbackListener, Plugin {
 	/*
 	* Constants
 	*/
 	const PLUGIN_ID			= 161;
-	const PLUGIN_VERSION	= 1.0;
+	const PLUGIN_VERSION	= 1.1;
 	const PLUGIN_NAME		= 'SimpleChatColorer';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -30,9 +33,10 @@ class SimpleChatColorer implements CallbackListener, Plugin {
 	* Private properties
 	*/
 	/** @var ManiaControl $maniaControl */
-	private $maniaControl	= null;
-	private $enabled		= false;
-	private $groups			= [];
+	private $maniaControl		= null;
+	private $enabled			= false;
+	private $groups				= [];
+	private $betterchatlogins	= [];
 
 	/**
 	 * @see \ManiaControl\Plugins\Plugin::prepare()
@@ -82,6 +86,9 @@ class SimpleChatColorer implements CallbackListener, Plugin {
 		$this->maniaControl = $maniaControl;
 		$this->maniaControl->getCallbackManager()->registerCallbackListener('ManiaPlanet.PlayerChat', $this, 'handlePlayerChat');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERDISCONNECT, $this, 'handlePlayerDisconnect');
+
+		$this->maniaControl->getCommandManager()->registerCommandListener('chatformat', $this, 'onCommandChatFormat', false, 'Add support of multiple chat formats (for Better Chat Openplanet plugin for exemple');
 
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_CHATDAMDMINCOLORER_USEADMINCOLOR, true, "Use Admin Color of Maniacontrol settings");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_CHATDAMDMINCOLORER_NUMBEROFGROUPS, 1, "Number of groups to setup");
@@ -108,6 +115,10 @@ class SimpleChatColorer implements CallbackListener, Plugin {
 		}
 	}
 
+
+	/**
+	 * Init chat prefix, groups, and players logins
+	 */
 	private function InitGroupsSettings() {
 		$i = 1;
 		$nbofgroups = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_CHATDAMDMINCOLORER_NUMBEROFGROUPS);
@@ -131,7 +142,11 @@ class SimpleChatColorer implements CallbackListener, Plugin {
 		}
 	}
 
-
+	/**
+	 * Handle when a player send a message in the chat
+	 *
+	 * @param array $callback
+	 */
 	public function handlePlayerChat($callback) {
 		$playerUid = $callback[1][0];
 		$login = $callback[1][1];
@@ -159,10 +174,58 @@ class SimpleChatColorer implements CallbackListener, Plugin {
 			}
 
 			try {
-				$this->maniaControl->getClient()->chatSendServerMessage('[$<' . $prefix . $nick . '$>] ' . $text);
+				if (!empty($this->betterchatlogins)) {
+					$jsonMessage = json_encode(['login' => $source_player->login, 'nickname' => $prefix . $nick, 'text' => $text], JSON_UNESCAPED_UNICODE);
+					$this->maniaControl->getClient()->chatSendServerMessage('CHAT_JSON:' . $jsonMessage, $this->betterchatlogins);
+
+					$defaultchatlogins = array();
+					foreach($this->maniaControl->getPlayerManager()->getPlayers(false) as $player) {
+						if (!in_array($player->login, $this->betterchatlogins)) {
+							array_push($defaultchatlogins, $player->login);
+						}
+					}
+					if (!empty($defaultchatlogins)) {
+						$this->maniaControl->getClient()->chatSendServerMessage('[$<' . $prefix . $nick . '$>] ' . $text, $defaultchatlogins);
+					}
+				} else {
+					$this->maniaControl->getClient()->chatSendServerMessage('[$<' . $prefix . $nick . '$>] ' . $text);
+				}
 			} catch (\Exception $e) {
-				echo "error while sending chat message to $login: " . $e->getMessage() . "\n";
+				echo "error while sending chat message from $login: " . $e->getMessage() . "\n";
 			}
+		}
+	}
+
+
+	/**
+	 * Command /chatformat
+	 * 
+	 * @param array			$chatCallback
+	 * @param \ManiaControl\Players\Player $player
+	 */
+	public function onCommandChatFormat(array $chatCallback, Player $player) {
+		$argument = $chatCallback[1][2];
+		$argument = explode(" ", $argument);
+
+		if (isset($argument[1]) && $argument[1] == "json") {
+			if (!in_array($player->login, $this->betterchatlogins)) {
+				array_push($this->betterchatlogins, $player->login);
+			}
+		} else if (isset($argument[1]) && $argument[1] == "default") {
+			if (($key = array_search($player->login, $this->betterchatlogins)) !== false) {
+				unset($this->betterchatlogins[$key]);
+			}
+		}
+	}
+
+	/**
+	 * Handle when a player disconnects
+	 * 
+	 * @param \ManiaControl\Players\Player $player
+	*/
+	public function handlePlayerDisconnect(Player $player) {
+		if (($key = array_search($player->login, $this->betterchatlogins)) !== false) {
+			unset($this->betterchatlogins[$key]);
 		}
 	}
 
