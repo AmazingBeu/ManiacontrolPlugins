@@ -1312,7 +1312,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * Handle Maniacontrol callback "BeginMatch"
 	 */
 	public function handleBeginMatchCallback() {
-		Logger::log("handleStartMatchStartCallback");
+		Logger::log("handleBeginMatchCallback");
 		if ($this->matchStarted && !$this->settingsloaded) {
 			Logger::log("Restarting map to restart match data");
 			$this->maniaControl->getClient()->restartMap();

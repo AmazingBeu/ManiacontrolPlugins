@@ -47,8 +47,19 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	const SETTING_MATCHMANAGERGSHEET_CLIENT_ID				= 'Google API Client_ID:';
 	const SETTING_MATCHMANAGERGSHEET_CLIENT_SECRET			= 'Google API Client_Secret:';
 	const SETTING_MATCHMANAGERGSHEET_SPREADSHEET			= 'GSheet Spreadsheet ID:';	
+	const SETTING_MATCHMANAGERGSHEET_DATA_MODE				= 'Data Storage Mode';
 
-	const SETTING_MATCHMANAGERGSHEET_SHEETNAME				= 'GSheet Sheet name:';	
+	const SETTING_MATCHMANAGERGSHEET_SHEETNAME				= 'GSheet Sheet name:';
+
+	const MODE_SPECIFICS_SETTINGS = [
+		"Last Round Only" => [
+			"ScoreTable_endColumnIndex" => 15
+		],
+		
+		"All Rounds Data"=> [
+			"ScoreTable_endColumnIndex" => 15
+		]
+	];
 
 
 	/*
@@ -60,6 +71,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	private $device_code			= "";
 	private $access_token			= "";
 	private $matchid				= "";
+	private $currentdatamode		= "";
 
 	private $playerlist				= array();
 
@@ -132,6 +144,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET, "", "Spreadsheet ID from the URL");
 
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCHMANAGERGSHEET_SHEETNAME, "#NAME# Finals", "Variables available: #MATCHID# #NAME# #LOGIN# #DATE#");
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCHMANAGERGSHEET_DATA_MODE, ["Last Round Only", "All Rounds Data"], "Mode how the data are send to Google Sheet");
 
 		$this->maniaControl->getCommandManager()->registerCommandListener('matchgsheet', $this, 'onCommandMatchGSheet', true, 'All MatchManager GSheet plugin commands');
 
@@ -180,6 +193,11 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			if ($setting->setting == self::SETTING_MATCHMANAGERGSHEET_CLIENT_SECRET && $setting->value != "hidden" && $setting->value != "") {
 				$this->saveSecretSetting("client_secret",$setting->value);
 				$this->maniaControl->getSettingManager()->setSetting($this, self::SETTING_MATCHMANAGERGSHEET_CLIENT_SECRET, "hidden");
+			}
+			if (($this->matchstatus == "running" || $this->matchstatus == "starting") && $setting->setting == self::SETTING_MATCHMANAGERGSHEET_DATA_MODE && $setting->value != $this->currentdatamode) {
+				$setting->value = $this->currentdatamode; 
+				$this->maniaControl->getSettingManager()->saveSetting($setting);
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'You can\'t change data mode during a Match');
 			}
 		}
 	}
@@ -492,6 +510,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 						}
 					}
 					$this->matchstatus = "starting";
+					$this->currentdatamode = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_DATA_MODE);
 					$this->PrepareSheet($sheetname, $sheetexists, $sheetsid );
 
 				}
@@ -589,7 +608,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$data->requests[$i]->repeatCell->range->startRowIndex = 0;
 			$data->requests[$i]->repeatCell->range->endRowIndex = 1;
 			$data->requests[$i]->repeatCell->range->startColumnIndex = 3;
-			$data->requests[$i]->repeatCell->range->endColumnIndex = 15;
+			$data->requests[$i]->repeatCell->range->endColumnIndex = self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["ScoreTable_endColumnIndex"];
 			$data->requests[$i]->repeatCell->cell = new \stdClass;
 			$data->requests[$i]->repeatCell->cell->userEnteredFormat = new \stdClass;
 			$data->requests[$i]->repeatCell->cell->userEnteredFormat->backgroundColor = new \stdClass;

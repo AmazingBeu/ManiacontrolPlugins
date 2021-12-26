@@ -22,7 +22,7 @@ class SimpleChatColorer implements CommandListener, CallbackListener, Plugin {
 	* Constants
 	*/
 	const PLUGIN_ID			= 161;
-	const PLUGIN_VERSION	= 1.1;
+	const PLUGIN_VERSION	= 1.2;
 	const PLUGIN_NAME		= 'SimpleChatColorer';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -211,7 +211,7 @@ class SimpleChatColorer implements CommandListener, CallbackListener, Plugin {
 			if (!in_array($player->login, $this->betterchatlogins)) {
 				array_push($this->betterchatlogins, $player->login);
 			}
-		} else if (isset($argument[1]) && $argument[1] == "default") {
+		} else if (isset($argument[1]) && $argument[1] == "text") {
 			if (($key = array_search($player->login, $this->betterchatlogins)) !== false) {
 				unset($this->betterchatlogins[$key]);
 			}
