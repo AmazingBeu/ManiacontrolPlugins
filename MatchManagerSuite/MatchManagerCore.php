@@ -38,7 +38,7 @@ use ManiaControl\Maps\Map;
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 3.0;
+	const PLUGIN_VERSION									= 3.1;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -408,10 +408,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->maniaControl = $maniaControl;
 		$this->initTables();
 
-		$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "This new version has a lot of code refactoring, please contact me if you encounter any bug via discord @Beu#1337 or Twitter @AmazingBeu");
-		$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "If you retrieve data from this plugin (via gsheet or others), be careful, the data format has changed");
-
-
 		//Settings
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_AUTHLEVEL, AuthenticationManager::getPermissionLevelNameArray(AuthenticationManager::AUTH_LEVEL_ADMIN), "Admin level needed to use the plugin");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SETTINGS_MODE, array('All from the plugin', 'Maps from file & Settings from plugin', 'All from file'), "Loading mode for maps and match settings, depending on your needs");
@@ -584,6 +580,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 	public function getRoundNumber() {
 		return $this->nbrounds;
+	}
+
+	public function getMapNumber() {
+		return $this->nbmaps;
 	}
 
 	public function getMatchPointsLimit() {
