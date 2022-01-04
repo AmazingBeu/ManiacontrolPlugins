@@ -480,7 +480,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 					return;
 				}
 
-				if ($this->currentdatamode == "All Rounds Data") {
+				if ($this->currentdatamode == "All Rounds Data" && $this->matchstatus == "running") {
 
 					$newcurrentscore = [];
 					foreach ($currentscore as $score) {
