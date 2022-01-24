@@ -1442,7 +1442,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						Logger::log("Pause");
 					} else {
 						$this->maniaControl->getChat()->sendInformation($this->chatprefix . '$o$iRound: ' . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
-						Logger::log("Round: " . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
+						if ($this->settings_nbroundsbymap != 1) {
+							Logger::log("Round: " . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
+						}
 					}
 				});
 			}
@@ -1552,8 +1554,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					$this->preendroundscore = array();
 					if (!$this->pauseon && !$this->skipround) {
 						if ($this->currentgmbase != "Cup" || ($this->currentgmbase == "Cup" && count($this->currentscore) > 0 && $this->currentscore[0][4] > 0)) { // Round is skipped if no one finishes only in cup mode
-							Logger::log("Round not counted because no one finished");
 							$this->nbrounds++;
+						} else {
+							Logger::log("Round not counted because no one finished");
 						}
 					}
 					if ($this->skipround) {
