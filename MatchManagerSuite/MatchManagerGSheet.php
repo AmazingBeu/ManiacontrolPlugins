@@ -35,7 +35,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 0.7;
+	const PLUGIN_VERSION									= 0.8;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
