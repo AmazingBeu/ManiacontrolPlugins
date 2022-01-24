@@ -66,7 +66,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 		"All Rounds Data"=> [
 			"ScoreTable_endColumnIndex" => 17,
 			"TeamsScoreTable_startColumnIndex" => 18,
-			"TeamsScoreTable_endColumnIndex" => 24,
+			"TeamsScoreTable_endColumnIndex" => 26,
 			"ScoreTable_BeginLetter" => "D",
 			"ScoreTable_EndLetter" => "Q",
 			"TeamsScoreTable_BeginLetter" => "S",
@@ -433,13 +433,14 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	public function UpdateGSheetData(String $matchid, Array $currentscore, Array $currentteamsscore) {
 		if ($this->refreshTokenIfNeeded()) {
 			$sheetname = $this->getSheetName();
+			$matchstatus = $this->matchstatus;
 
 			$data = new \stdClass;
 			$data->valueInputOption = "RAW";
 
 			$data->data[0] = new \stdClass;
 			$data->data[0]->range = "'" . $sheetname . "'!B2";
-			$data->data[0]->values = array(array($this->matchstatus),array($this->MatchManagerCore->getCountMap()),array($this->MatchManagerCore->getCountRound()),array($this->maniaControl->getPlayerManager()->getPlayerCount()),array($this->maniaControl->getPlayerManager()->getSpectatorCount()));
+			$data->data[0]->values = array(array($matchstatus),array($this->MatchManagerCore->getCountMap()),array($this->MatchManagerCore->getCountRound()),array($this->maniaControl->getPlayerManager()->getPlayerCount()),array($this->maniaControl->getPlayerManager()->getSpectatorCount()));
 
 			$data->data[1] = new \stdClass;
 			$data->data[1]->range = "'" . $sheetname . "'!A9";
@@ -469,7 +470,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
 			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 			$asyncHttpRequest->setContent(json_encode($data));
-			$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname, $currentscore, $currentteamsscore) {
+			$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname, $currentscore, $currentteamsscore, $matchstatus) {
 				if ($error) {
 					Logger::logError('Error: ' . $error);
 					return;
@@ -480,8 +481,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 					return;
 				}
 
-				if ($this->currentdatamode == "All Rounds Data" && $this->matchstatus == "running") {
-
+				if ($this->currentdatamode == "All Rounds Data" && $matchstatus == "running") {
 					$newcurrentscore = [];
 					foreach ($currentscore as $score) {
 						array_push($newcurrentscore,array_merge([$this->MatchManagerCore->getMapNumber() , $this->MatchManagerCore->getRoundNumber()], $score));
@@ -541,14 +541,17 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	}
 
 	function onCallbackEndRound(String $matchid, Array $currentscore, Array $currentteamsscore) {
+		Logger::Log('onCallbackEndRound');
 		$this->matchstatus = "running";
 		$this->UpdateGSheetData($matchid, $currentscore, $currentteamsscore);
 	}
 	function onCallbackEndMatch(String $matchid, Array $currentscore, Array $currentteamsscore) {
+		Logger::Log('onCallbackEndMatch');
 		$this->matchstatus = "ended";
 		$this->UpdateGSheetData($matchid, $currentscore, $currentteamsscore);
 	}
 	function onCallbackStopMatch(String $matchid, Array $currentscore, Array $currentteamsscore) {
+		Logger::Log('onCallbackStopMatch');
 		$this->matchstatus = "stopped";
 		$this->UpdateGSheetData($matchid, $currentscore, $currentteamsscore);
 	}
