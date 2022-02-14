@@ -1,6 +1,15 @@
 *
 !README.md
 !docs
+!docs/*
 !MatchManagerSuite
+!MatchManagerSuite/*
 !Beu
+!Beu/ChatAdminColorer.php
+!Beu/GameModeDevTools.php
+!Beu/GuestlistManager.php
+!Beu/MoreModesTools.php
+!Beu/SimpleChatColorer.php
+!Beu/SimpleSkinsRemover.php
 !TFH
+!TFH/*
