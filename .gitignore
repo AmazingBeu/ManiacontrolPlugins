@@ -6,7 +6,7 @@
 !MatchManagerSuite/*
 !Beu
 !Beu/ChatAdminColorer.php
-!Beu/GameModeDevTools.php
+!Beu/ReloadDevTool.php
 !Beu/GuestlistManager.php
 !Beu/MoreModesTools.php
 !Beu/SimpleChatColorer.php

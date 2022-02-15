@@ -68,7 +68,7 @@ class MoreModesTools implements CommandListener, Plugin {
 	 * @see \ManiaControl\Plugins\Plugin::getDescription()
 	 */
 	public static function getDescription() {
-		return 'Tool to manage the Guestlist';
+		return 'Simple tool to send XmlRpc Callbacks';
 	}
 
 	/**
