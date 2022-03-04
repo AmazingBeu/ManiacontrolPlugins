@@ -15,6 +15,7 @@ use ManiaControl\Files\AsyncHttpRequest;
 use ManiaControl\Commands\CommandListener;
 use ManiaControl\Admin\AuthenticationManager;
 use ManiaControl\Callbacks\TimerListener;
+use ManiaControl\Utils\WebReader;
 
 if (! class_exists('MatchManagerSuite\MatchManagerCore')) {
 	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is needed to use MatchManagerGSheet plugin. Install it and restart Maniacontrol');
@@ -35,7 +36,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 1.0;
+	const PLUGIN_VERSION									= 1.1;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -339,30 +340,26 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 
 		if (!empty($refreshtoken) && !empty($expire) && !empty($clientid) && !empty($clientsecret)) {
 			if (time() >= $expire) {
-				$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://oauth2.googleapis.com/token?grant_type=refresh_token&client_id=' . $clientid . '&client_secret=' . $clientsecret . '&refresh_token=' . $refreshtoken);
-				$asyncHttpRequest->setContentType("application/x-www-form-urlencoded");
-				$asyncHttpRequest->setCallable(function ($json, $error) {
-					if (!$json) {
-						Logger::logError('Impossible to Google API: ' . $json);
-						return;
-					}
-					$data = json_decode($json);
-					if (!$data) {
-						Logger::logError('Json parse error: ' . $json);
-						return;
-					}
-					if (isset($data->access_token)) {
-						$this->access_token = $data->access_token;
-						$this->saveSecretSetting("access_token", $data->access_token);
-						$this->saveSecretSetting("expire", time() + $data->expires_in);
-					} elseif (isset($data->error_description)) {
-						$this->maniaControl->getChat()->sendErrorToAdmins('Google refused the request: ' . $data->error_description);
-					} else {
-						$this->maniaControl->getChat()->sendErrorToAdmins('Unkown error');
-					}
-				});
-
-				$asyncHttpRequest->postData(1000);
+				$response = WebReader::postUrl('https://oauth2.googleapis.com/token?grant_type=refresh_token&client_id=' . $clientid . '&client_secret=' . $clientsecret . '&refresh_token=' . $refreshtoken);
+				$json = $response->getContent();
+				if (!$json) {
+					Logger::logError('Impossible to Google API: ' . $json);
+					return;
+				}
+				$data = json_decode($json);
+				if (!$data) {
+					Logger::logError('Json parse error: ' . $json);
+					return;
+				}
+				if (isset($data->access_token)) {
+					$this->access_token = $data->access_token;
+					$this->saveSecretSetting("access_token", $data->access_token);
+					$this->saveSecretSetting("expire", time() + $data->expires_in);
+				} elseif (isset($data->error_description)) {
+					$this->maniaControl->getChat()->sendErrorToAdmins('Google refused the request: ' . $data->error_description);
+				} else {
+					$this->maniaControl->getChat()->sendErrorToAdmins('Unkown error');
+				}
 			}
 			return true;
 		}
