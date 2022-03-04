@@ -11,10 +11,10 @@ use ManiaControl\Players\Player;
 use ManiaControl\Plugins\Plugin;
 use ManiaControl\Settings\Setting;
 use ManiaControl\Settings\SettingManager;
-use ManiaControl\Utils\WebReader;
 use ManiaControl\Files\AsyncHttpRequest;
 use ManiaControl\Commands\CommandListener;
 use ManiaControl\Admin\AuthenticationManager;
+use ManiaControl\Callbacks\TimerListener;
 
 if (! class_exists('MatchManagerSuite\MatchManagerCore')) {
 	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is needed to use MatchManagerGSheet plugin. Install it and restart Maniacontrol');
@@ -30,12 +30,12 @@ use MatchManagerSuite\MatchManagerCore;
  * @author		Beu
  * @license		http://www.gnu.org/licenses/ GNU General Public License, Version 3
  */
-class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
+class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandListener, Plugin {
 	/*
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 0.8;
+	const PLUGIN_VERSION									= 0.9;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -246,28 +246,33 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$this->maniaControl->getChat()->sendError('Client ID empty', $player);
 			return;
 		}
-		$response = WebReader::postUrl('https://oauth2.googleapis.com/device/code?scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fspreadsheets&client_id=' . $clientid);
-		$json = $response->getContent();
-		if (!$json) {
-			Logger::logError('Impossible to Google API: ' . $json);
-			$this->maniaControl->getChat()->sendError('Impossible to Google API: ' . $json, $player);
-			return;
-		}
-		$data = json_decode($json);
-		if (!$data) {
-			Logger::logError('Json parse error: ' . $json);
-			$this->maniaControl->getChat()->sendError('Json parse error: ' . $json, $player);
-			return;
-		}
-		if (isset($data->device_code)) {
-			$this->device_code = $data->device_code;
-			$this->maniaControl->getChat()->sendSuccess('Open $<$l['. $data->verification_url . ']this link$> and type this code: "' . $data->user_code .'"' , $player);
-			$this->maniaControl->getChat()->sendSuccess('After have validate the App, type the commande "//matchgsheet step2"' , $player);
-		} elseif (isset($data->error_code)) {
-			$this->maniaControl->getChat()->sendError('Google refused the request: ' . $data->error_code, $player);
-		} else {
-			$this->maniaControl->getChat()->sendError('Unkown error' , $player);
-		}
+
+		$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://oauth2.googleapis.com/device/code?scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fspreadsheets&client_id=' . $clientid);
+		$asyncHttpRequest->setContentType("application/x-www-form-urlencoded");
+		$asyncHttpRequest->setCallable(function ($json, $error) use ($player) {
+			if (!$json) {
+				Logger::logError('Impossible to Google API: ' . $json);
+				$this->maniaControl->getChat()->sendError('Impossible to Google API: ' . $json, $player);
+				return;
+			}
+			$data = json_decode($json);
+			if (!$data) {
+				Logger::logError('Json parse error: ' . $json);
+				$this->maniaControl->getChat()->sendError('Json parse error: ' . $json, $player);
+				return;
+			}
+			if (isset($data->device_code)) {
+				$this->device_code = $data->device_code;
+				$this->maniaControl->getChat()->sendSuccess('Open $<$l['. $data->verification_url . ']this link$> and type this code: "' . $data->user_code .'"' , $player);
+				$this->maniaControl->getChat()->sendSuccess('After have validate the App, type the commande "//matchgsheet step2"' , $player);
+			} elseif (isset($data->error_code)) {
+				$this->maniaControl->getChat()->sendError('Google refused the request: ' . $data->error_code, $player);
+			} else {
+				$this->maniaControl->getChat()->sendError('Unkown error' , $player);
+			}
+		});
+
+		$asyncHttpRequest->postData(1000);
 	}
 
 	private function OAuth2Step2(Player $player) {
@@ -291,32 +296,37 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			return;
 		}
 
-		$response = WebReader::postUrl('https://oauth2.googleapis.com/token?grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code&client_id=' . $clientid . '&client_secret=' . $clientsecret . '&device_code=' . $this->device_code);
-		$json = $response->getContent();
-		if (!$json) {
-			Logger::logError('Impossible to Google API: ' . $json);
-			$this->maniaControl->getChat()->sendError('Impossible to Google API: ' . $json, $player);
-			return;
-		}
-		$data = json_decode($json);
-		if (!$data) {
-			Logger::logError('Json parse error: ' . $json);
-			$this->maniaControl->getChat()->sendError('Json parse error: ' . $json, $player);
-			return;
-		}
-		if (isset($data->access_token)) {
-			$this->access_token = $data->access_token;
-			$this->saveSecretSetting("access_token", $data->access_token);
-			$this->saveSecretSetting("expire", time() + $data->expires_in);
-			$this->saveSecretSetting("refresh_token", $data->refresh_token);
-			$this->maniaControl->getChat()->sendSuccess('Maniacontrol is registered' , $player);
-		} elseif (isset($data->error_description)) {
-			Logger::logError('Google refused the request: ' . $data->error_description);
-			$this->maniaControl->getChat()->sendError('Google refused the request: ' . $data->error_description , $player);
-		} else {
-			Logger::logError('Unkown error' . $data->error_description);
-			$this->maniaControl->getChat()->sendError('Unkown error' , $player);
-		}
+		$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://oauth2.googleapis.com/token?grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code&client_id=' . $clientid . '&client_secret=' . $clientsecret . '&device_code=' . $this->device_code);
+		$asyncHttpRequest->setContentType("application/x-www-form-urlencoded");
+		$asyncHttpRequest->setHeaders(array("Content-Length: 0"));
+		$asyncHttpRequest->setCallable(function ($json, $error) use ($player) {
+			if (!$json) {
+				Logger::logError('Impossible to Google API: ' . $json);
+				$this->maniaControl->getChat()->sendError('Impossible to Google API: ' . $json, $player);
+				return;
+			}
+			$data = json_decode($json);
+			if (!$data) {
+				Logger::logError('Json parse error: ' . $json);
+				$this->maniaControl->getChat()->sendError('Json parse error: ' . $json, $player);
+				return;
+			}
+			if (isset($data->access_token)) {
+				$this->access_token = $data->access_token;
+				$this->saveSecretSetting("access_token", $data->access_token);
+				$this->saveSecretSetting("expire", time() + $data->expires_in);
+				$this->saveSecretSetting("refresh_token", $data->refresh_token);
+				$this->maniaControl->getChat()->sendSuccess('Maniacontrol is registered' , $player);
+			} elseif (isset($data->error_description)) {
+				Logger::logError('Google refused the request: ' . $data->error_description);
+				$this->maniaControl->getChat()->sendError('Google refused the request: ' . $data->error_description , $player);
+			} else {
+				Logger::logError('Unkown error' . $data->error_description);
+				$this->maniaControl->getChat()->sendError('Unkown error' , $player);
+			}
+		});
+
+		$asyncHttpRequest->postData(1000);
 	}
 
 	private function refreshTokenIfNeeded() {
@@ -326,29 +336,33 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 		$refreshtoken = $this->getSecretSetting("refresh_token");
 		$clientid = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_CLIENT_ID);
 		$clientsecret = $this->getSecretSetting("client_secret");
-		
+
 		if (!empty($refreshtoken) && !empty($expire) && !empty($clientid) && !empty($clientsecret)) {
 			if (time() >= $expire) {
-				$response = WebReader::postUrl('https://oauth2.googleapis.com/token?grant_type=refresh_token&client_id=' . $clientid . '&client_secret=' . $clientsecret . '&refresh_token=' . $refreshtoken);
-				$json = $response->getContent();
-				if (!$json) {
-					Logger::logError('Impossible to Google API: ' . $json);
-					return;
-				}
-				$data = json_decode($json);
-				if (!$data) {
-					Logger::logError('Json parse error: ' . $json);
-					return;
-				}
-				if (isset($data->access_token)) {
-					$this->access_token = $data->access_token;
-					$this->saveSecretSetting("access_token", $data->access_token);
-					$this->saveSecretSetting("expire", time() + $data->expires_in);
-				} elseif (isset($data->error_description)) {
-					$this->maniaControl->getChat()->sendError('Google refused the request: ' . $data->error_description , $player);
-				} else {
-					$this->maniaControl->getChat()->sendError('Unkown error' , $player);
-				}
+				$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://oauth2.googleapis.com/token?grant_type=refresh_token&client_id=' . $clientid . '&client_secret=' . $clientsecret . '&refresh_token=' . $refreshtoken);
+				$asyncHttpRequest->setContentType("application/x-www-form-urlencoded");
+				$asyncHttpRequest->setCallable(function ($json, $error) use ($player) {
+					if (!$json) {
+						Logger::logError('Impossible to Google API: ' . $json);
+						return;
+					}
+					$data = json_decode($json);
+					if (!$data) {
+						Logger::logError('Json parse error: ' . $json);
+						return;
+					}
+					if (isset($data->access_token)) {
+						$this->access_token = $data->access_token;
+						$this->saveSecretSetting("access_token", $data->access_token);
+						$this->saveSecretSetting("expire", time() + $data->expires_in);
+					} elseif (isset($data->error_description)) {
+						$this->maniaControl->getChat()->sendError('Google refused the request: ' . $data->error_description , $player);
+					} else {
+						$this->maniaControl->getChat()->sendError('Unkown error' , $player);
+					}
+				});
+
+				$asyncHttpRequest->postData(1000);
 			}
 			return true;
 		}
@@ -410,7 +424,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 					$this->maniaControl->getChat()->sendError("Can't access to the Spreadsheet: " . $data->error->message, $player);
 				}
 			});
-	
+
 			$asyncHttpRequest->getData(1000);
 		} else {
 			$this->maniaControl->getChat()->sendError("Can't have access to Google API service", $player);
@@ -445,7 +459,6 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 			$data->data[1] = new \stdClass;
 			$data->data[1]->range = "'" . $sheetname . "'!A9";
 
-			
 			foreach ($this->maniaControl->getPlayerManager()->getPlayers() as $player) {
 				$this->playerlist[$player->login] = $player->nickname;
 			}
@@ -460,7 +473,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 				$data->data[2] = new \stdClass;
 				$data->data[2]->range = "'" . $sheetname . "'!" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["ScoreTable_BeginLetter"] . "2";
 				$data->data[2]->values = $currentscore;
-	
+
 				$data->data[3] = new \stdClass;
 				$data->data[3]->range = "'" . $sheetname . "'!" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["TeamsScoreTable_BeginLetter"] . "2";
 				$data->data[3]->values = $currentteamsscore;
@@ -486,12 +499,12 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 					foreach ($currentscore as $score) {
 						array_push($newcurrentscore,array_merge([$this->MatchManagerCore->getMapNumber() , $this->MatchManagerCore->getRoundNumber()], $score));
 					}
-	
+
 					$data = new \stdClass;
 					$data->range = "'" . $sheetname . "'!" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["ScoreTable_BeginLetter"] . "1:" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["ScoreTable_EndLetter"] . "1" ;
 					$data->majorDimension = "ROWS";
 					$data->values = $newcurrentscore;
-	
+
 					$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values/' . urlencode("'". $sheetname . "'") . "!" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["ScoreTable_BeginLetter"] . "1:" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["ScoreTable_EndLetter"] . "1:append?valueInputOption=RAW");
 					$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
 					$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
@@ -512,12 +525,12 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 							foreach ($currentteamsscore as $score) {
 								array_push($newcurrentteamsscore,array_merge([$this->MatchManagerCore->getMapNumber() , $this->MatchManagerCore->getRoundNumber()], $score));
 							}
-			
+
 							$data = new \stdClass;
 							$data->range = "'" . $sheetname . "'!" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["TeamsScoreTable_BeginLetter"] . "1:" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["TeamsScoreTable_EndLetter"] . "1" ;
 							$data->majorDimension = "ROWS";
 							$data->values = $newcurrentteamsscore;
-			
+
 							$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values/' . urlencode("'". $sheetname . "'") . "!" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["TeamsScoreTable_BeginLetter"] . "1:" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["TeamsScoreTable_EndLetter"] . "1:append?valueInputOption=RAW");
 							$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
 							$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
@@ -548,7 +561,10 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 	function onCallbackEndMatch(String $matchid, Array $currentscore, Array $currentteamsscore) {
 		Logger::Log('onCallbackEndMatch');
 		$this->matchstatus = "ended";
-		$this->UpdateGSheetData($matchid, $currentscore, $currentteamsscore);
+
+		$this->maniaControl->getTimerManager()->registerOneTimeListening($this, function () use ($matchid, $currentscore, $currentteamsscore) {
+			$this->UpdateGSheetData($matchid, $currentscore, $currentteamsscore);
+		}, 1000); // Wait a sec before sending last data to avoid collision
 	}
 	function onCallbackStopMatch(String $matchid, Array $currentscore, Array $currentteamsscore) {
 		Logger::Log('onCallbackStopMatch');
@@ -594,7 +610,7 @@ class MatchManagerGSheet implements  CallbackListener, CommandListener, Plugin {
 
 				}
 			});
-	
+
 			$asyncHttpRequest->getData(1000);
 		}
 	}
