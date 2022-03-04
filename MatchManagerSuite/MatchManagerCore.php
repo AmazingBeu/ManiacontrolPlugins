@@ -38,7 +38,7 @@ use ManiaControl\Maps\Map;
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 3.1;
+	const PLUGIN_VERSION									= 3.2;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -819,6 +819,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		}
 		if (isset($this->currentgmsettings[self::SETTING_MATCH_S_ROUNDSPERMAP])) {
 			$this->settings_nbroundsbymap	= (int) $this->currentgmsettings[self::SETTING_MATCH_S_ROUNDSPERMAP];
+		} else {
+			$this->settings_nbroundsbymap = 1;
 		}
 		if ($this->currentgmbase == "Champion") {
 			$this->settings_nbmapsbymatch	= (int) $this->currentgmsettings[self::SETTING_MATCH_S_ROUNDSLIMIT];
@@ -1441,8 +1443,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'The match is currently on $<$F00pause$>!');
 						Logger::log("Pause");
 					} else {
-						$this->maniaControl->getChat()->sendInformation($this->chatprefix . '$o$iRound: ' . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
 						if ($this->settings_nbroundsbymap != 1) {
+							$this->maniaControl->getChat()->sendInformation($this->chatprefix . '$o$iRound: ' . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
 							Logger::log("Round: " . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
 						}
 					}
