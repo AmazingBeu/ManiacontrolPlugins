@@ -341,7 +341,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			if (time() >= $expire) {
 				$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://oauth2.googleapis.com/token?grant_type=refresh_token&client_id=' . $clientid . '&client_secret=' . $clientsecret . '&refresh_token=' . $refreshtoken);
 				$asyncHttpRequest->setContentType("application/x-www-form-urlencoded");
-				$asyncHttpRequest->setCallable(function ($json, $error) use ($player) {
+				$asyncHttpRequest->setCallable(function ($json, $error) {
 					if (!$json) {
 						Logger::logError('Impossible to Google API: ' . $json);
 						return;
@@ -356,9 +356,9 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 						$this->saveSecretSetting("access_token", $data->access_token);
 						$this->saveSecretSetting("expire", time() + $data->expires_in);
 					} elseif (isset($data->error_description)) {
-						$this->maniaControl->getChat()->sendError('Google refused the request: ' . $data->error_description , $player);
+						$this->maniaControl->getChat()->sendErrorToAdmins('Google refused the request: ' . $data->error_description);
 					} else {
-						$this->maniaControl->getChat()->sendError('Unkown error' , $player);
+						$this->maniaControl->getChat()->sendErrorToAdmins('Unkown error');
 					}
 				});
 
