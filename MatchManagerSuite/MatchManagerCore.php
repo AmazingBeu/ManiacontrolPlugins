@@ -38,7 +38,7 @@ use ManiaControl\Maps\Map;
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 3.2;
+	const PLUGIN_VERSION									= 3.3;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -1555,8 +1555,15 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					//
 					$this->preendroundscore = array();
 					if (!$this->pauseon && !$this->skipround) {
-						if ($this->currentgmbase != "Cup" || ($this->currentgmbase == "Cup" && count($this->currentscore) > 0 && $this->currentscore[0][4] > 0)) { // Round is skipped if no one finishes only in cup mode
+						if ($this->currentgmbase != "Cup") {
 							$this->nbrounds++;
+						} else if ($this->currentgmbase == "Cup" && count($this->currentscore) > 0) { // Round is skipped if no one finishes only in cup mode
+							foreach ($this->currentscore as $score) {
+								if ($score[4] > 0) {
+									$this->nbrounds++;
+									break;
+								}
+							}
 						} else {
 							Logger::log("Round not counted because no one finished");
 						}
