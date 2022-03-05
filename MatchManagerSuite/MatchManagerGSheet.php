@@ -36,7 +36,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 1.1;
+	const PLUGIN_VERSION									= 1.2;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -451,7 +451,11 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 
 			$data->data[0] = new \stdClass;
 			$data->data[0]->range = "'" . $sheetname . "'!B2";
-			$data->data[0]->values = array(array($matchstatus),array($this->MatchManagerCore->getCountMap()),array($this->MatchManagerCore->getCountRound()),array($this->maniaControl->getPlayerManager()->getPlayerCount()),array($this->maniaControl->getPlayerManager()->getSpectatorCount()));
+			if ($this->matchstatus == "ended") {
+				$data->data[0]->values = array(array($matchstatus));
+			} else {
+				$data->data[0]->values = array(array($matchstatus),array($this->MatchManagerCore->getCountMap()),array($this->MatchManagerCore->getCountRound()),array($this->maniaControl->getPlayerManager()->getPlayerCount()),array($this->maniaControl->getPlayerManager()->getSpectatorCount()));
+			}
 
 			$data->data[1] = new \stdClass;
 			$data->data[1]->range = "'" . $sheetname . "'!A9";
