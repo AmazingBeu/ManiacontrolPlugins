@@ -38,7 +38,7 @@ use ManiaControl\Maps\Map;
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 3.3;
+	const PLUGIN_VERSION									= 3.4;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -409,12 +409,14 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->initTables();
 
 		//Settings
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_AUTHLEVEL, AuthenticationManager::getPermissionLevelNameArray(AuthenticationManager::AUTH_LEVEL_ADMIN), "Admin level needed to use the plugin");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SETTINGS_MODE, array('All from the plugin', 'Maps from file & Settings from plugin', 'All from file'), "Loading mode for maps and match settings, depending on your needs");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_DURATION, 120, "Default Pause Duration in seconds");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Champion", "Cup", "Knockout", "Laps", "Teams", "TimeAttack", "Rounds", "RoyalTimeAttack"), "Gamemode to launch for the match");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSX, 0, "Position of the Pause Countdown (on X axis)");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSY, 43, "Position of the Pause Countdown (on Y axis)");
+		// Last argument is the priority to sort settings, works only with the TrackManiaControl fork (https://git.virtit.fr/beu/TrackManiaControl)
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_AUTHLEVEL, AuthenticationManager::getPermissionLevelNameArray(AuthenticationManager::AUTH_LEVEL_ADMIN), "Admin level needed to use the plugin", 10);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_DURATION, 120, "Default Pause Duration in seconds", 15);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSX, 0, "Position of the Pause Countdown (on X axis)", 15);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSY, 43, "Position of the Pause Countdown (on Y axis)", 15);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SETTINGS_MODE, array('All from the plugin', 'Maps from file & Settings from plugin', 'All from file'), "Loading mode for maps and match settings, depending on your needs", 20);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Champion", "Cup", "Knockout", "Laps", "Teams", "TimeAttack", "Rounds", "RoyalTimeAttack"), "Gamemode to launch for the match", 25);
+
 
 		// Init dynamics settings
 		$this->updateSettings();
@@ -445,7 +447,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		// Register Socket commands
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.GetMatchStatus", $this, function () { return new CommunicationAnswer($this->getMatchStatus()); });
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.GetCurrentScore", $this, function () { return new CommunicationAnswer($this->getCurrentScore()); });
-		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.GetPlayers", $this, function () { return new CommunicationAnswer($this->getPlayers()); });
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.MatchStart", $this, function () { return new CommunicationAnswer($this->MatchStart()); });
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.MatchStop", $this, function () { return new CommunicationAnswer($this->MatchStop()); });
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.GetMatchOptions", $this, function () { return new CommunicationAnswer($this->getGMSettings($this->currentgmbase,$this->currentcustomgm)); });
@@ -652,7 +653,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			}
 		}
 		foreach ($modesettings as $key => $value) {
-			$this->maniaControl->getSettingManager()->initSetting($this, $key, self::SETTINGS_MODE_LIST[$key]['default'], self::SETTINGS_MODE_LIST[$key]['description']);
+			$this->maniaControl->getSettingManager()->initSetting($this, $key, self::SETTINGS_MODE_LIST[$key]['default'], self::SETTINGS_MODE_LIST[$key]['description'], 50);
 		}
 
 		if ($settingsmode == 'Maps from file & Settings from plugin' || $settingsmode == 'All from the plugin') {
@@ -665,7 +666,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				}
 			}
 			foreach ($gmsettings as $key => $value) {
-				$this->maniaControl->getSettingManager()->initSetting($this, $key, $value['default'], $value['description']);
+				$this->maniaControl->getSettingManager()->initSetting($this, $key, $value['default'], $value['description'], 100);
 			}
 		} else {
 			foreach ($allsettings as $key => $value) {
@@ -868,7 +869,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				$maps = explode(',', $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MODE_MAPS));
 				foreach ($maps as $map) {
 					try {
-						$mapInfo = new Map($this->maniaControl->getClient()->getMapInfo($map));
+						$mapInfo = $this->maniaControl->getMapManager()->initializeMap($this->maniaControl->getClient()->getMapInfo($map));
 					} catch (Exception $e) {
 						throw new \Exception("Error with the map " . $map . ": " . $e->getMessage());
 					}
