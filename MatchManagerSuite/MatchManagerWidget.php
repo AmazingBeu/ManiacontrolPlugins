@@ -42,7 +42,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 * Constants
 	 */
 	const PLUGIN_ID											= 153;
-	const PLUGIN_VERSION									= 1.5;
+	const PLUGIN_VERSION									= 1.6;
 	const PLUGIN_NAME										= 'MatchManager Widget';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -68,6 +68,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 */
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl 			= null;
+	private $MatchManagerCore		= null;
 	private $gmbase					= "";
 	private $manialinkData			= "";
 	private $manialinkBackground	= "";
@@ -147,6 +148,12 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCHMANAGERWIDGET_LIVE_WIDTH, 42, "Width of the widget");
 
 		$this->generateMatchLiveWidgetBackground();
+
+		if ($this->MatchManagerCore->getMatchStatus()) {
+			$this->gmbase = $this->MatchManagerCore->getCurrentGamemodeBase();
+			$this->displayManialinks(false);
+		}
+
 		return true;
 	}
 
