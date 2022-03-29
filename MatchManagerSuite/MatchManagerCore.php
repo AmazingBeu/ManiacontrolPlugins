@@ -27,7 +27,6 @@ use ManiaControl\Configurator\GameModeSettings;
 use ManiaControl\Utils\Formatter;
 use Maniaplanet\DedicatedServer\InvalidArgumentException;
 use ManiaControl\Callbacks\TimerListener; // for pause
-use ManiaControl\Maps\Map;
 
 /**
  * MatchManager Core
@@ -324,7 +323,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	private $chatprefix				= '$<$fc3$w🏆$m$> '; // Would like to create a setting but MC database doesn't support utf8mb4
 	private $nbmaps					= 0;
 	private $nbrounds				= 0;
-	private $nbspectators			= 0;
 	private $currentgmbase			= "";
 	private $currentcustomgm		= "";
 	private $currentsettingmode		= "";
@@ -334,17 +332,13 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 	// Settings to keep in memory
 	private $settings_nbroundsbymap	= 5;
-	private $settings_nbwinner		= 2;
+	private $settings_nbwinners		= 2;
 	private $settings_nbmapsbymatch	= 0;
 	private $settings_pointlimit	= 100;
-
-	private $nbwinners				= 0;
-	private $scriptSettings			= array();
 
 	private $currentscore			= array();
 	private $preendroundscore		= array();
 	private $currentteamsscore		= array();
-	private $playerpause			= array();
 	private $pausetimer				= 0;
 	private $pauseon				= false;
 
@@ -557,6 +551,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 	public function getMatchStatus() {
 		return $this->matchStarted;
+	}
+
+	public function getCurrentGamemodeBase() {
+		return $this->currentgmbase;
 	}
 
 	public function getCountRound() {
@@ -852,6 +850,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * Function called to start the match
 	 */
 	public function MatchStart() {
+		if ($this->matchStarted) {
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " a match is already launched");
+			return;
+		}
 		try {
 			$this->matchid = $this->maniaControl->getServer()->login . "-" . time();
 			$this->currentgmbase = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE);
@@ -1027,7 +1029,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 */
 	public function MatchStop() {
 		Logger::log("Match stop");
-
+		if (!$this->matchStarted) {
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " No match launched");
+			return;
+		}
 
 		try {
 			// Trigger Callback

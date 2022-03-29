@@ -9,23 +9,19 @@ use FML\Controls\Quads\Quad_Bgs1InRace;
 use FML\ManiaLink;
 use ManiaControl\Callbacks\CallbackListener;
 use ManiaControl\Callbacks\CallbackManager;
-use ManiaControl\Callbacks\Callbacks;
-use ManiaControl\Callbacks\Structures\Common\BasePlayerTimeStructure;
-use ManiaControl\Callbacks\Structures\TrackMania\OnScoresStructure;
-use ManiaControl\Callbacks\Structures\TrackMania\OnWayPointEventStructure;
 use ManiaControl\Logger;
 use ManiaControl\ManiaControl;
 use ManiaControl\Manialinks\ManialinkPageAnswerListener;
 use ManiaControl\Players\Player;
 use ManiaControl\Players\PlayerManager;
 use ManiaControl\Plugins\Plugin;
+use ManiaControl\Plugins\PluginManager;
 use ManiaControl\Settings\Setting;
 use ManiaControl\Settings\SettingManager;
-use ManiaControl\Utils\Formatter;
 
-if (! class_exists('MatchManagerSuite\MatchManagerCore')) {
-	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is needed to use MatchManager Widget plugin. Install it and restart Maniacontrol');
-	Logger::logError('MatchManager Core is needed to use MatchManager Widget plugin. Install it and restart Maniacontrol');
+if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
+	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
+	Logger::logError('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
 	return false;
 }
 use MatchManagerSuite\MatchManagerCore;
@@ -127,10 +123,11 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 		$this->MatchManagerCore = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERCORE_PLUGIN);
 
 		if ($this->MatchManagerCore == Null) {
-			throw new \Exception('MatchManager Core is needed to use MatchManager Widget plugin');
+			throw new \Exception('MatchManager Core is needed to use ' . self::PLUGIN_NAME);
 		}
 
 		// Callbacks
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_UNLOADED, $this, 'handlePluginUnloaded');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STARTMATCH, $this, 'InitMatch');
@@ -151,6 +148,15 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 
 		if ($this->MatchManagerCore->getMatchStatus()) {
 			$this->gmbase = $this->MatchManagerCore->getCurrentGamemodeBase();
+
+			if ($this->gmbase == "Teams") {
+				$currentscore = $this->MatchManagerCore->getCurrentTeamsScore();
+			} else {
+				$currentscore = $this->MatchManagerCore->getCurrentScore();
+			}
+			if (count($currentscore) > 0) {
+				$this->generateMatchLiveWidgetData($currentscore);
+			}
 			$this->displayManialinks(false);
 		}
 
@@ -162,6 +168,20 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 */
 	public function unload() {
 		$this->closeWidgets();
+	}
+
+	/**
+	 * handlePluginUnloaded
+	 *
+	 * @param  string $pluginClass
+	 * @param  Plugin $plugin
+	 * @return void
+	 */
+	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
+		$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
+		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
+			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
+		}
 	}
 
 	/**
@@ -376,7 +396,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 				$this->closeWidgets();
 			}
 		}
-		
+
 	}
 
 
