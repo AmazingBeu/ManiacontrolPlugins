@@ -3,12 +3,11 @@
 namespace MatchManagerSuite;
 
 use ManiaControl\Callbacks\CallbackListener;
-use ManiaControl\Callbacks\CallbackManager;
-use ManiaControl\Callbacks\Callbacks;
 use ManiaControl\Logger;
 use ManiaControl\ManiaControl;
 use ManiaControl\Players\Player;
 use ManiaControl\Plugins\Plugin;
+use ManiaControl\Plugins\PluginManager;
 use ManiaControl\Settings\Setting;
 use ManiaControl\Settings\SettingManager;
 use ManiaControl\Files\AsyncHttpRequest;
@@ -17,9 +16,9 @@ use ManiaControl\Admin\AuthenticationManager;
 use ManiaControl\Callbacks\TimerListener;
 use ManiaControl\Utils\WebReader;
 
-if (! class_exists('MatchManagerSuite\MatchManagerCore')) {
-	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is needed to use MatchManagerGSheet plugin. Install it and restart Maniacontrol');
-	Logger::logError('MatchManager Core is needed to use MatchManager GSheet plugin. Install it and restart Maniacontrol');
+if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
+	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
+	Logger::logError('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
 	return false;
 }
 use MatchManagerSuite\MatchManagerCore;
@@ -36,7 +35,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 1.2;
+	const PLUGIN_VERSION									= 1.3;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -83,6 +82,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 */
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl 			= null;
+	private $MatchManagerCore		= null;
 	private $matchstatus			= "";
 	private $device_code			= "";
 	private $access_token			= "";
@@ -144,10 +144,11 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		$this->MatchManagerCore = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERCORE_PLUGIN);
 
 		if ($this->MatchManagerCore == Null) {
-			throw new \Exception('MatchManager Core is needed to use MatchManager GSheet plugin');
+			throw new \Exception('MatchManager Core is needed to use ' . self::PLUGIN_NAME);
 		}
 
 		// Callbacks
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_UNLOADED, $this, 'handlePluginUnloaded');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STARTMATCH, $this, 'CheckAndPrepareSheet');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_ENDROUND, $this, 'onCallbackEndRound');
@@ -175,6 +176,20 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * @see \ManiaControl\Plugins\Plugin::unload()
 	 */
 	public function unload() {
+	}
+
+	/**
+	 * handlePluginUnloaded
+	 *
+	 * @param  string $pluginClass
+	 * @param  Plugin $plugin
+	 * @return void
+	 */
+	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
+		$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
+		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
+			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
+		}
 	}
 
 	/**
@@ -451,7 +466,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 
 			$data->data[0] = new \stdClass;
 			$data->data[0]->range = "'" . $sheetname . "'!B2";
-			if ($this->matchstatus == "ended") {
+			if ($matchstatus == "ended") {
 				$data->data[0]->values = array(array($matchstatus));
 			} else {
 				$data->data[0]->values = array(array($matchstatus),array($this->MatchManagerCore->getCountMap()),array($this->MatchManagerCore->getCountRound()),array($this->maniaControl->getPlayerManager()->getPlayerCount()),array($this->maniaControl->getPlayerManager()->getSpectatorCount()));

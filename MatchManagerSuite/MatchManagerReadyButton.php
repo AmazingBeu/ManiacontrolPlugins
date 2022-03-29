@@ -4,29 +4,26 @@ namespace MatchManagerSuite;
 
 use FML\Controls\Frame;
 use FML\Controls\Labels\Label_Text;
-use FML\Controls\Label;
 use FML\Controls\Quad;
 use FML\ManiaLink;
 use ManiaControl\Callbacks\CallbackListener;
-use ManiaControl\Callbacks\CallbackManager;
-use ManiaControl\Callbacks\Callbacks;
 use ManiaControl\Logger;
 use ManiaControl\ManiaControl;
 use ManiaControl\Manialinks\ManialinkPageAnswerListener;
 use ManiaControl\Players\Player;
 use ManiaControl\Players\PlayerManager;
 use ManiaControl\Plugins\Plugin;
+use ManiaControl\Plugins\PluginManager;
 use ManiaControl\Settings\Setting;
 use ManiaControl\Settings\SettingManager;
 use ManiaControl\Commands\CommandListener;
 
 
-if (! class_exists('MatchManagerSuite\MatchManagerCore')) {
-	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is needed to use MatchManager Ready Button plugin. Install it and restart Maniacontrol');
-	Logger::logError('MatchManager Core is needed to use MatchManager Ready Button plugin. Install it and restart Maniacontrol');
+if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
+	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
+	Logger::logError('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
 	return false;
 }
-use MatchManagerSuite\MatchManagerCore;
 
 
 /**
@@ -40,7 +37,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 158;
-	const PLUGIN_VERSION									= 1.0;
+	const PLUGIN_VERSION									= 1.1;
 	const PLUGIN_NAME										= 'MatchManager Ready Button';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -59,6 +56,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 */
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl 			= null;
+	private $MatchManagerCore		= null;
 	private $chatprefix				= '$<$fc3$w🏆$m$> '; // Would like to create a setting but MC database doesn't support utf8mb4
 
 	private $playersreadystate		= array();
@@ -119,7 +117,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 		$this->MatchManagerCore = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERCORE_PLUGIN);
 
 		if ($this->MatchManagerCore == Null) {
-			throw new \Exception('MatchManager Core is needed to use MatchManager Ready Button plugin');
+			throw new \Exception('MatchManager Core is needed to use ' . self::PLUGIN_NAME);
 		}
 
 		$this->maniaControl->getCommandManager()->registerCommandListener('ready', $this, 'onCommandSetReadyPlayer', false, 'Change status to Ready.');
@@ -129,6 +127,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_READY_POSX, 152.5, "Position of the Ready widget (on X axis)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_READY_POSY, 40, "Position of the Ready widget (on Y axis)");
 
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_UNLOADED, $this, 'handlePluginUnloaded');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
 
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERDISCONNECT, $this, 'handlePlayerDisconnect');
@@ -148,6 +147,20 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 */
 	public function unload() {
 		$this->closeReadyWidget();
+	}
+
+	/**
+	 * handlePluginUnloaded
+	 *
+	 * @param  string $pluginClass
+	 * @param  Plugin $plugin
+	 * @return void
+	 */
+	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
+		$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
+		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
+			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
+		}
 	}
 
 	/**
