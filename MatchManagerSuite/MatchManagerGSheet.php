@@ -35,7 +35,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 1.3;
+	const PLUGIN_VERSION									= 1.4;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -186,8 +186,8 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * @return void
 	 */
 	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
-		$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
 		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
+			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
 			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
 		}
 	}
@@ -266,9 +266,9 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://oauth2.googleapis.com/device/code?scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fspreadsheets&client_id=' . $clientid);
 		$asyncHttpRequest->setContentType("application/x-www-form-urlencoded");
 		$asyncHttpRequest->setCallable(function ($json, $error) use ($player) {
-			if (!$json) {
-				Logger::logError('Impossible to Google API: ' . $json);
-				$this->maniaControl->getChat()->sendError('Impossible to Google API: ' . $json, $player);
+			if (!$json || $error) {
+				Logger::logError('Error from Google API: ' . $error);
+				$this->maniaControl->getChat()->sendError('Error from Google API: ' . $error, $player);
 				return;
 			}
 			$data = json_decode($json);
@@ -316,9 +316,9 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		$asyncHttpRequest->setContentType("application/x-www-form-urlencoded");
 		$asyncHttpRequest->setHeaders(array("Content-Length: 0"));
 		$asyncHttpRequest->setCallable(function ($json, $error) use ($player) {
-			if (!$json) {
-				Logger::logError('Impossible to Google API: ' . $json);
-				$this->maniaControl->getChat()->sendError('Impossible to Google API: ' . $json, $player);
+			if (!$json || $error) {
+				Logger::logError('Error from Google API: ' . $error);
+				$this->maniaControl->getChat()->sendError('Error from Google API: ' . $error, $player);
 				return;
 			}
 			$data = json_decode($json);
@@ -357,8 +357,10 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			if (time() >= $expire) {
 				$response = WebReader::postUrl('https://oauth2.googleapis.com/token?grant_type=refresh_token&client_id=' . $clientid . '&client_secret=' . $clientsecret . '&refresh_token=' . $refreshtoken);
 				$json = $response->getContent();
-				if (!$json) {
-					Logger::logError('Impossible to Google API: ' . $json);
+				$error = $response->getError();
+				if (!$json || $error) {
+					Logger::logError('Error during token refresh: ' . $error);
+					$this->maniaControl->getChat()->sendErrorToAdmins('Error during token refresh: ' . $error);
 					return;
 				}
 				$data = json_decode($json);
@@ -419,7 +421,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
 			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 			$asyncHttpRequest->setCallable(function ($json, $error) use ($player) {
-				if ($error) {
+				if (!$json || $error) {
 					Logger::logError('Error: ' . $error);
 					$this->maniaControl->getChat()->sendError('Error: ' . $error, $player);
 					return;
@@ -500,13 +502,15 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 			$asyncHttpRequest->setContent(json_encode($data));
 			$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname, $currentscore, $currentteamsscore, $matchstatus) {
-				if ($error) {
-					Logger::logError('Error: ' . $error);
+				if (!$json || $error) {
+					Logger::logError('Error from Google API: ' . $error);
+					$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
 					return;
 				}
 				$data = json_decode($json);
 				if (!$data) {
 					Logger::logError('Json parse error: ' . $json);
+					$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
 					return;
 				}
 
@@ -526,13 +530,15 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 					$asyncHttpRequest->setContent(json_encode($data));
 					$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname, $currentscore, $currentteamsscore) {
-						if ($error) {
-							Logger::logError('Error: ' . $error);
+						if (!$json || $error) {
+							Logger::logError('Error from Google API: ' . $error);
+							$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
 							return;
 						}
 						$data = json_decode($json);
 						if (!$data) {
 							Logger::logError('Json parse error: ' . $json);
+							$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
 							return;
 						}
 
@@ -552,9 +558,16 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 							$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 							$asyncHttpRequest->setContent(json_encode($data));
 							$asyncHttpRequest->setCallable(function ($json, $error) {
+								if (!$json || $error) {
+									Logger::logError('Error from Google API: ' . $error);
+									$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
+									return;
+								}
 								$data = json_decode($json);
-								if ($error || !$data) {
-									Logger::logError('Error while Sending data: ' . print_r($error, true));
+								if (!$data) {
+									Logger::logError('Json parse error: ' . $json);
+									$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+									return;
 								}
 							});
 							$asyncHttpRequest->postData(1000);
@@ -595,13 +608,15 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
 			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 			$asyncHttpRequest->setCallable(function ($json, $error) {
-				if ($error) {
-					Logger::logError('Error: ' . $error);
+				if (!$json || $error) {
+					Logger::logError('Error from Google API: ' . $error);
+					$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
 					return;
 				}
 				$data = json_decode($json);
 				if (!$data) {
 					Logger::logError('Json parse error: ' . $json);
+					$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
 					return;
 				}
 
@@ -758,17 +773,31 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 			$asyncHttpRequest->setContent(json_encode($data));
 			$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname) {
+				if (!$json || $error) {
+					Logger::logError('Error from Google API: ' . $error);
+					$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
+					return;
+				}
 				$data = json_decode($json);
-				if ($error || !$data) {
-					Logger::logError('Error while Sending data: ' . print_r($error, true));
+				if (!$data) {
+					Logger::logError('Json parse error: ' . $json);
+					$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+					return;
 				}
 				// Clear Scoreboards data
 				$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values/' . urlencode("'". $sheetname . "'") . '!A1:Z300:clear');
 				$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 				$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname) {
+					if (!$json || $error) {
+						Logger::logError('Error from Google API: ' . $error);
+						$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
+						return;
+					}
 					$data = json_decode($json);
-					if ($error || !$data) {
-						Logger::logError('Error while Sending data: ' . print_r($error, true));
+					if (!$data) {
+						Logger::logError('Json parse error: ' . $json);
+						$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+						return;
 					}
 					// Add headers data
 					$data = new \stdClass;
@@ -790,10 +819,17 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
 					$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 					$asyncHttpRequest->setContent(json_encode($data));
-					$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname) {
+					$asyncHttpRequest->setCallable(function ($json, $error) {
+						if (!$json || $error) {
+							Logger::logError('Error from Google API: ' . $error);
+							$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
+							return;
+						}
 						$data = json_decode($json);
-						if ($error || !$data) {
-							Logger::logError('Error while Sending data: ' . print_r($error, true));
+						if (!$data) {
+							Logger::logError('Json parse error: ' . $json);
+							$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+							return;
 						}
 					});
 					$asyncHttpRequest->postData(1000);

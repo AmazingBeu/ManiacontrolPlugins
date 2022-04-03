@@ -38,7 +38,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 * Constants
 	 */
 	const PLUGIN_ID											= 153;
-	const PLUGIN_VERSION									= 1.6;
+	const PLUGIN_VERSION									= 1.7;
 	const PLUGIN_NAME										= 'MatchManager Widget';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -178,8 +178,8 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 * @return void
 	 */
 	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
-		$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
 		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
+			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
 			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
 		}
 	}

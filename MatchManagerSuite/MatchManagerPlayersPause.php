@@ -28,7 +28,7 @@ if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
 
 
 /**
- * MatchManager Widgets
+ * MatchManager Players Pause
  *
  * @author		Beu
  * @license		http://www.gnu.org/licenses/ GNU General Public License, Version 3
@@ -38,7 +38,7 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	 * Constants
 	 */
 	const PLUGIN_ID											= 159;
-	const PLUGIN_VERSION									= 1.1;
+	const PLUGIN_VERSION									= 1.2;
 	const PLUGIN_NAME										= 'MatchManager Players Pause';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -165,8 +165,8 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	 * @return void
 	 */
 	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
-		$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
 		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
+			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
 			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
 		}
 	}

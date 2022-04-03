@@ -18,7 +18,7 @@ if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
 }
 
 /**
- * MatchManager Automatic Launche
+ * MatchManager Automatic Launcher
  *
  * @author		Beu
  * @license		http://www.gnu.org/licenses/ GNU General Public License, Version 3
@@ -28,7 +28,7 @@ class MatchManagerAutomaticLauncher implements CallbackListener, TimerListener, 
 	 * Constants
 	 */
 	const PLUGIN_ID											= 172;
-	const PLUGIN_VERSION									= 1.0;
+	const PLUGIN_VERSION									= 1.1;
 	const PLUGIN_NAME										= 'MatchManager Automatic Launcher';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -144,8 +144,8 @@ class MatchManagerAutomaticLauncher implements CallbackListener, TimerListener, 
 	 * @return void
 	 */
 	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
-		$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
 		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
+			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
 			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
 		}
 	}

@@ -27,7 +27,7 @@ if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
 
 
 /**
- * MatchManager Widgets
+ * MatchManager Ready Button
  *
  * @author		Beu
  * @license		http://www.gnu.org/licenses/ GNU General Public License, Version 3
@@ -37,7 +37,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 158;
-	const PLUGIN_VERSION									= 1.1;
+	const PLUGIN_VERSION									= 1.2;
 	const PLUGIN_NAME										= 'MatchManager Ready Button';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -157,8 +157,8 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 * @return void
 	 */
 	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
-		$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
 		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
+			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
 			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
 		}
 	}
