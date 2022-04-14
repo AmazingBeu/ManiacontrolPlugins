@@ -37,7 +37,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 3.5;
+	const PLUGIN_VERSION									= 3.6;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -58,6 +58,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	// Plugin Settings
 	const SETTING_MATCH_AUTHLEVEL							= 'Auth level for the match* commands:';
 	const SETTING_MATCH_CUSTOM_GAMEMODE						= 'Custom Gamemode file';
+	const SETTING_MATCH_DONT_DELETE_SETTINGS				= 'Don\'t delete settings';
 	const SETTING_MATCH_GAMEMODE_BASE						= 'Gamemode used during match:';
 	const SETTING_MATCH_PAUSE_DURATION						= 'Default Pause Duration in seconds';
 	const SETTING_MATCH_PAUSE_POSX							= 'Pause Widget-Position: X';
@@ -404,13 +405,16 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 		//Settings
 		// Last argument is the priority to sort settings, works only with the TrackManiaControl fork (https://git.virtit.fr/beu/TrackManiaControl)
+		if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL") && $this->maniaControl->getSettingManager()->getSettingValue($this->maniaControl->getSettingManager(), SettingManager::SETTING_ALLOW_UNLINK_SERVER)) {
+			$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_DONT_DELETE_SETTINGS, false, "to prevent to remove a setting of an another server", 5);
+		}
+
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_AUTHLEVEL, AuthenticationManager::getPermissionLevelNameArray(AuthenticationManager::AUTH_LEVEL_ADMIN), "Admin level needed to use the plugin", 10);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_DURATION, 120, "Default Pause Duration in seconds", 15);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSX, 0, "Position of the Pause Countdown (on X axis)", 15);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSY, 43, "Position of the Pause Countdown (on Y axis)", 15);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SETTINGS_MODE, array('All from the plugin', 'Maps from file & Settings from plugin', 'All from file'), "Loading mode for maps and match settings, depending on your needs", 20);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Champion", "Cup", "Knockout", "Laps", "Teams", "TimeAttack", "Rounds", "RoyalTimeAttack"), "Gamemode to launch for the match", 25);
-
 
 		// Init dynamics settings
 		$this->updateSettings();
@@ -603,7 +607,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * @param Setting $setting
 	*/
 	public function updateSettings(Setting $setting = null) {
-		Logger::log("updateSettings");
 		if (isset($setting) && $setting->belongsToClass($this) && $this->matchStarted) {
 			if ($setting->setting == self::SETTING_MATCH_GAMEMODE_BASE && $setting->value != $this->currentgmbase) {
 				$setting->value = $this->currentgmbase; 
@@ -639,6 +642,11 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			}
 		}
 
+		if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL") && $this->maniaControl->getSettingManager()->getSettingValue($this->maniaControl->getSettingManager(), SettingManager::SETTING_ALLOW_UNLINK_SERVER)) {
+			$deletesettings = !$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_DONT_DELETE_SETTINGS);
+		} else {
+			$deletesettings = true;
+		}
 		$allsettings = $this->maniaControl->getSettingManager()->getSettingsByClass($this);
 		$settingsmode = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE);
 		$modesettings = $this->getModeSettings($settingsmode);
@@ -646,7 +654,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$name = $value->setting;
 			if (array_key_exists($name,self::SETTINGS_MODE_LIST)) {
 				if (!isset($modesettings[$name])) {
-					$this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+					if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
 				}
 			}
 		}
@@ -660,7 +668,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			foreach ($allsettings as $key => $value) {
 				$name = $value->setting;
 				if (substr($name,0, 2) == "S_" && !isset($gmsettings[$name])) {
-					$this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+					if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
 				}
 			}
 			foreach ($gmsettings as $key => $value) {
@@ -670,7 +678,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			foreach ($allsettings as $key => $value) {
 				$name = $value->setting;
 				if (substr($name,0, 2) == "S_") {
-					$this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+					if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
 				}
 			}
 		}
