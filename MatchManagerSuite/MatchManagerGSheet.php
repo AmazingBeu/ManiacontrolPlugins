@@ -216,6 +216,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	public function updateSettings(Setting $setting) {
 		if ($setting->belongsToClass($this)) {
 			if (($setting->setting == self::SETTING_MATCHMANAGERGSHEET_CLIENT_SECRET && $setting->value == "hidden") || $setting->setting == self::SETTING_MATCHMANAGERGSHEET_CLIENT_ID) {
+				// (Check when hidden = true to avoid double message)
 				$this->maniaControl->getChat()->sendErrorToAdmins('Google API Session cleared. You must revalidate a session with //matchgsheet step1');
 
 				$this->saveSecretSetting("access_token");
@@ -223,7 +224,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				$this->saveSecretSetting("refresh_token");
 			}
 			if ($setting->setting == self::SETTING_MATCHMANAGERGSHEET_CLIENT_SECRET && $setting->value != "hidden" && $setting->value != "") {
-				$this->saveSecretSetting("client_secret",$setting->value);
+				$this->saveSecretSetting("client_secret", $setting->value);
 				$this->maniaControl->getSettingManager()->setSetting($this, self::SETTING_MATCHMANAGERGSHEET_CLIENT_SECRET, "hidden");
 			}
 			if (($this->matchstatus == "running" || $this->matchstatus == "starting") && $setting->setting == self::SETTING_MATCHMANAGERGSHEET_DATA_MODE && $setting->value != $this->currentdatamode) {
