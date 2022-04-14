@@ -120,6 +120,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 */
 	public function load(ManiaControl $maniaControl) {
 		$this->maniaControl = $maniaControl;
+		/** @var MatchManagerCore */
 		$this->MatchManagerCore = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERCORE_PLUGIN);
 
 		if ($this->MatchManagerCore == Null) {
