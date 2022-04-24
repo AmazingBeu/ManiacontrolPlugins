@@ -42,7 +42,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 * Constants
 	 */
 	const PLUGIN_ID											= 171;
-	const PLUGIN_VERSION									= 1.0;
+	const PLUGIN_VERSION									= 1.1;
 	const PLUGIN_NAME										= 'MatchManager Multiple Config Manager';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -58,6 +58,9 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	const ML_ACTION_SAVE_CONFIG								= 'MatchManager.MultiConfigManager.SaveConfig';
 	const ML_ACTION_SAVE_CONFIG_PAGE						= 'MatchManager.MultiConfigManager.SaveConfigPage';
 	const ML_NAME_CONFIGNAME								= 'MatchManager.MultiConfigManager.ConfigName';
+
+	const CB_LOADCONFIG										= 'MatchManager.MultiConfigManager.LoadConfig';
+	const CB_SAVECONFIG										= 'MatchManager.MultiConfigManager.SaveConfig';
 
 	/*
 	 * Private properties
@@ -234,7 +237,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 * @param  int $id
 	 * @return void
 	 */
-	private function loadConfig(int $id) {
+	public function loadConfig(int $id) {
 		if ($this->MatchManagerCore->getMatchStatus()) {
 			Logger::logError("Impossible to load config during a match");
 			$this->maniaControl->getChat()->sendErrorToAdmins('Impossible to load config during a match');
@@ -284,6 +287,8 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 				$this->maniaControl->getChat()->sendSuccessToAdmins('MatchManager Config "' . $result[0]["name"] . '" loaded');
 			}
 		}
+
+		$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_LOADCONFIG, $result[0]["name"]);
 	}
 
 	/**
@@ -292,7 +297,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 * @param  array $fields
 	 * @return void
 	 */
-	private function saveConfig(array $fields) {
+	public function saveConfig(array $fields) {
 		Logger::log("[MatchManagerMultipleConfigManager] Saving current config");
 		$result = array();
 		$configname = "";
@@ -331,6 +336,18 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 		if (!$query->execute()) {
 			trigger_error('Error executing MySQL query: ' . $query->error);
 		}
+		$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_LOADCONFIG, $configname);
+	}
+
+	public function getSavedConfigs() {
+		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
+		$query = 'SELECT `id`,`name`,`gamemodebase`,`date` FROM `' . self::DB_MATCHCONFIG . '` ORDER BY id DESC';
+		$result = $mysqli->query($query);
+		if ($mysqli->error) {
+			trigger_error($mysqli->error, E_USER_ERROR);
+		}
+
+		return $result->fetch_all(MYSQLI_ASSOC);
 	}
 
 
@@ -381,15 +398,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 		$posY      = $height / 2 - 10;
 		$pageFrame = null;
 
-		// get data
-		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-		$query = 'SELECT `id`,`name`,`gamemodebase`,`date` FROM `' . self::DB_MATCHCONFIG . '` ORDER BY id DESC';
-		$result = $mysqli->query($query);
-		if ($mysqli->error) {
-			trigger_error($mysqli->error, E_USER_ERROR);
-		}
-
-		while ($config = $result->fetch_object()) {
+		foreach ($this->getSavedConfigs() as $config) {
 			if ($index % 16 === 0) {
 				$pageFrame = new Frame();
 				$frame->addChild($pageFrame);
@@ -409,10 +418,10 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 			}
 
 			$labelLine = new LabelLine($configFrame);
-			$labelLine->addLabelEntryText($config->id, $posX + 5, 13);
-			$labelLine->addLabelEntryText($config->name, $posX + 15, 52);
-			$labelLine->addLabelEntryText($config->gamemodebase, $posX + 70, 31);
-			$labelLine->addLabelEntryText($config->date, $posX + 100, $width / 2 - ($posX + 110));
+			$labelLine->addLabelEntryText($config["id"], $posX + 5, 13);
+			$labelLine->addLabelEntryText($config["name"], $posX + 15, 52);
+			$labelLine->addLabelEntryText($config["gamemodebase"], $posX + 70, 31);
+			$labelLine->addLabelEntryText($config["date"], $posX + 100, $width / 2 - ($posX + 110));
 			$labelLine->render();
 
 			// Remove Config button
@@ -425,9 +434,9 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 			$removeButton->setText('');
 			$removeButton->setTextColor('a00');
 
-			$confirmFrame = $this->buildConfirmFrame($maniaLink, $posY, $config->id, true);
+			$confirmFrame = $this->buildConfirmFrame($maniaLink, $posY, $config["id"], true);
 			$removeButton->addToggleFeature($confirmFrame);
-			$description = 'Remove Config: ' . $config->name;
+			$description = 'Remove Config: ' . $config["name"];
 			$removeButton->addTooltipLabelFeature($descriptionLabel, $description);
 
 			// Load config button
@@ -441,9 +450,9 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 				$loadLabel->setText('');
 				$loadLabel->setTextColor('0f0');
 
-				$confirmFrame = $this->buildConfirmFrame($maniaLink, $posY, $config->id);
+				$confirmFrame = $this->buildConfirmFrame($maniaLink, $posY, $config["id"]);
 				$loadLabel->addToggleFeature($confirmFrame);
-				$description = 'Load Config: ' . $config->name;
+				$description = 'Load Config: ' . $config["name"];
 				$loadLabel->addTooltipLabelFeature($descriptionLabel, $description);
 			}
 			$configFrame->setY($posY);
