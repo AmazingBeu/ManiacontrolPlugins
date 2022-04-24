@@ -37,7 +37,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 3.6;
+	const PLUGIN_VERSION									= 3.7;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -776,7 +776,13 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						}
 					}
 					fclose($handle);
+				} else {
+					Logger::logError("Impossible to read custom game mode file");
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " Impossible to read custom game mode file");
 				}
+			} else {
+				Logger::logError("Custom game mode file doesn't exist");
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " Custom game mode file doesn't exist");
 			}
 		}
 
@@ -1207,7 +1213,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$this->closePauseWidget();
 			$this->pauseon = false;
 			$this->skipround = true;
-			$this->maniaControl->getModeScriptEventManager()->endPause();			
+			$this->maniaControl->getModeScriptEventManager()->endPause();
 		}
 	}
 
@@ -1729,7 +1735,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		}
 		$this->skipround = true;
 		$this->maniaControl->getModeScriptEventManager()->forceTrackmaniaRoundEnd();
-
 	}
 
 	/**
@@ -1802,8 +1807,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		if (($this->matchStarted) && (!in_array($this->currentgmbase, ["Laps", "TimeAttack", "RoyalTimeAttack"]) || ( $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from file' && !empty($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE)))) && $this->pauseon) {
 			$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Admin stopped the break');
 			$this->unsetNadeoPause();
-		} else {
-			$this->maniaControl->getChat()->sendError($this->chatprefix . 'No pause in progress', $player->login);
 		}
 	}
 
