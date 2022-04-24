@@ -37,7 +37,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 158;
-	const PLUGIN_VERSION									= 1.2;
+	const PLUGIN_VERSION									= 1.3;
 	const PLUGIN_NAME										= 'MatchManager Ready Button';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -46,7 +46,8 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 
 	const ACTION_READY										= 'ReadyButton.Action';
 	const MLID_MATCH_READY_WIDGET							= 'Ready ButtonWidget';
-	const SETTING_MATCH_READY_MODE							= 'Enable plugin';
+	const SETTING_MATCH_ENABLE_PLUGIN						= 'Enable plugin';
+	const SETTING_MATCH_DISABLE_AFTER_MATCH					= 'Disable widget after the match';
 	const SETTING_MATCH_READY_NBPLAYERS						= 'Minimal number of players before start';
 	const SETTING_MATCH_READY_POSX							= 'Position: X';
 	const SETTING_MATCH_READY_POSY							= 'Position: Y';
@@ -122,7 +123,8 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 
 		$this->maniaControl->getCommandManager()->registerCommandListener('ready', $this, 'onCommandSetReadyPlayer', false, 'Change status to Ready.');
 
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_READY_MODE, false, "Activate Ready widget");
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_ENABLE_PLUGIN, false, "Activate Ready widget");
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_DISABLE_AFTER_MATCH, false, "Disable the widget after the match");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_READY_NBPLAYERS, 2, "Minimal number of players to start a match if all are ready");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_READY_POSX, 152.5, "Position of the Ready widget (on X axis)");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_READY_POSY, 40, "Position of the Ready widget (on Y axis)");
@@ -178,7 +180,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	public function updateSettings(Setting $setting) {
 		if ($setting->belongsToClass($this)) {
 			$this->updateManialinks();
-			$this->StartMatchIfNeeded();			
+			$this->StartMatchIfNeeded();
 		}
 	}
 
@@ -188,7 +190,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 * @param Player $player or null
 	 */
 	private function StartMatchIfNeeded($player = null) {
-		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_MODE) && !$this->MatchManagerCore->getMatchStatus()) {
+		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_ENABLE_PLUGIN) && !$this->MatchManagerCore->getMatchStatus()) {
 			$nbplayers = $this->maniaControl->getPlayerManager()->getPlayerCount();
 			if ($nbplayers >= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_NBPLAYERS)) {
 				$nbready = 0;
@@ -205,9 +207,8 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 					return;
 				}
 			}
-
-			$this->displayReadyWidgetIfNeeded($player);	
 		}
+		$this->displayReadyWidgetIfNeeded($player);
 	}
 
 	/**
@@ -216,9 +217,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 * @param string $login
 	 */
 	public function displayReadyWidgetIfNeeded($player = null) {
-
-		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_MODE) && !$this->MatchManagerCore->getMatchStatus()) {
-
+		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_ENABLE_PLUGIN) && !$this->MatchManagerCore->getMatchStatus()) {
 			if ($player == null) {
 				$players = $this->maniaControl->getPlayerManager()->getPlayers(true,true);
 			} else {
@@ -232,6 +231,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 				} else if (!$player->isSpectator && !isset($this->playersreadystate[$player->login])) {
 					$this->playersreadystate[$player->login] = 0;
 					$this->maniaControl->getManialinkManager()->sendManialink($this->MLisNotReady, $player->login);
+					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'You can now set you $<$f00Ready$> by clicking on the button', $player);
 				} else if (!$player->isSpectator && isset($this->playersreadystate[$player->login])) {
 					if ($this->playersreadystate[$player->login] == 1) {
 						$this->maniaControl->getManialinkManager()->sendManialink($this->MLisReady, $player->login);
@@ -240,6 +240,8 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 					}
 				}
 			}
+		} else if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_ENABLE_PLUGIN) && $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_DISABLE_AFTER_MATCH) && $this->MatchManagerCore->getMatchStatus()) {
+			$this->maniaControl->getSettingManager()->setSetting($this, self::SETTING_MATCH_ENABLE_PLUGIN, false);
 		} else {
 			$this->playersreadystate = array();
 			$this->closeReadyWidget();
@@ -257,7 +259,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 
 	/**
 	 * Handle when a player disconnects
-	 * 
+	 *
 	 * @param \ManiaControl\Players\Player $player
 	*/
 	public function handlePlayerDisconnect(Player $player) {
@@ -269,7 +271,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 
 	/**
 	 * Handle Ready state of the player
-	 * 
+	 *
 	 * @param array			$callback
 	 * @param \ManiaControl\Players\Player $player
 	*/
@@ -293,7 +295,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 * @param \ManiaControl\Players\Player $player
 	*/
 	public function onCommandSetReadyPlayer(array $chatCallback, Player $player) {
-		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_MODE) && (!$this->MatchManagerCore->getMatchStatus())) {
+		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_ENABLE_PLUGIN) && (!$this->MatchManagerCore->getMatchStatus())) {
 			$this->handleReady($chatCallback, $player);
 		}
 	}
