@@ -35,7 +35,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 1.4;
+	const PLUGIN_VERSION									= 1.5;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -63,7 +63,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			"ScoreTable_Labels" => ["Rank","Login", "MatchPoints", "MapPoints", "RoundPoints","BestRaceTime","BestRaceCheckpoints","BestLaptime","BestLapCheckpoints","PrevRaceTime","PrevRaceCheckpoints","Team"],
 			"TeamsScoreTable_Labels" => ["Rank","Team ID", "Name", "MatchPoints", "MapPoints", "RoundPoints"]
 		],		
-		"All Rounds Data"=> [
+		"All Rounds Data" => [
 			"ScoreTable_endColumnIndex" => 17,
 			"TeamsScoreTable_startColumnIndex" => 18,
 			"TeamsScoreTable_endColumnIndex" => 26,
@@ -73,6 +73,17 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			"TeamsScoreTable_EndLetter" => "X",
 			"ScoreTable_Labels" => ["Map", "Round", "Rank","Login", "MatchPoints", "MapPoints", "RoundPoints","BestRaceTime","BestRaceCheckpoints","BestLaptime","BestLapCheckpoints","PrevRaceTime","PrevRaceCheckpoints","Team"],
 			"TeamsScoreTable_Labels" => ["Map", "Round", "Rank","Team ID", "Name", "MatchPoints", "MapPoints", "RoundPoints"]
+		],
+		"End Match Only" => [
+			"ScoreTable_endColumnIndex" => 15,
+			"TeamsScoreTable_startColumnIndex" => 16,
+			"TeamsScoreTable_endColumnIndex" => 22,
+			"ScoreTable_BeginLetter" => "D",
+			"ScoreTable_EndLetter" => "O",
+			"TeamsScoreTable_BeginLetter" => "Q",
+			"TeamsScoreTable_EndLetter" => "V",
+			"ScoreTable_Labels" => ["Rank","Login", "MatchPoints", "MapPoints", "RoundPoints","BestRaceTime","BestRaceCheckpoints","BestLaptime","BestLapCheckpoints","PrevRaceTime","PrevRaceCheckpoints","Team"],
+			"TeamsScoreTable_Labels" => ["Rank","Team ID", "Name", "MatchPoints", "MapPoints", "RoundPoints"]
 		]
 	];
 
@@ -161,7 +172,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET, "", "Spreadsheet ID from the URL");
 
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCHMANAGERGSHEET_SHEETNAME, "#NAME# Finals", "Variables available: #MATCHID# #NAME# #LOGIN# #DATE#");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCHMANAGERGSHEET_DATA_MODE, ["Last Round Only", "All Rounds Data"], "Mode how the data are send to Google Sheet");
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCHMANAGERGSHEET_DATA_MODE, ["Last Round Only", "All Rounds Data", "End Match Only"], "Mode how the data are send to Google Sheet");
 
 		$this->maniaControl->getCommandManager()->registerCommandListener('matchgsheet', $this, 'onCommandMatchGSheet', true, 'All MatchManager GSheet plugin commands');
 
@@ -460,16 +471,18 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	}
 
 	public function UpdateGSheetData(String $matchid, Array $currentscore, Array $currentteamsscore) {
+		$matchstatus = $this->matchstatus;
+		if ($this->currentdatamode === "End Match Only" && $this->matchstatus === "running") return;
+
 		if ($this->refreshTokenIfNeeded()) {
 			$sheetname = $this->getSheetName();
-			$matchstatus = $this->matchstatus;
 
 			$data = new \stdClass;
 			$data->valueInputOption = "RAW";
 
 			$data->data[0] = new \stdClass;
 			$data->data[0]->range = "'" . $sheetname . "'!B2";
-			if ($matchstatus == "ended") {
+			if ($matchstatus == "ended" && $this->currentdatamode !== "End Match Only") {
 				$data->data[0]->values = array(array($matchstatus));
 			} else {
 				$data->data[0]->values = array(array($matchstatus),array($this->MatchManagerCore->getCountMap()),array($this->MatchManagerCore->getCountRound()),array($this->maniaControl->getPlayerManager()->getPlayerCount()),array($this->maniaControl->getPlayerManager()->getSpectatorCount()));
@@ -488,7 +501,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 
 			$data->data[1]->values = $players;
 
-			if ($this->currentdatamode == "Last Round Only") {
+			if ($this->currentdatamode === "Last Round Only" || $this->currentdatamode === "End Match Only") {
 				$data->data[2] = new \stdClass;
 				$data->data[2]->range = "'" . $sheetname . "'!" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["ScoreTable_BeginLetter"] . "2";
 				$data->data[2]->values = $currentscore;
