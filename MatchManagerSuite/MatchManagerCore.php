@@ -37,7 +37,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 3.7;
+	const PLUGIN_VERSION									= 3.8;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -63,6 +63,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	const SETTING_MATCH_PAUSE_DURATION						= 'Default Pause Duration in seconds';
 	const SETTING_MATCH_PAUSE_POSX							= 'Pause Widget-Position: X';
 	const SETTING_MATCH_PAUSE_POSY							= 'Pause Widget-Position: Y';
+	const SETTING_MATCH_POST_MATCH_MAPLIST					= 'Post Match Maplist file';
 
 	const SETTING_MATCH_SETTINGS_MODE						= 'Loading mode for settings and maps';
 
@@ -414,6 +415,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSX, 0, "Position of the Pause Countdown (on X axis)", 15);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSY, 43, "Position of the Pause Countdown (on Y axis)", 15);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SETTINGS_MODE, array('All from the plugin', 'Maps from file & Settings from plugin', 'All from file'), "Loading mode for maps and match settings, depending on your needs", 20);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_POST_MATCH_MAPLIST, "", "Load Mapfile after the match (empty to just load TA)", 20);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Champion", "Cup", "Knockout", "Laps", "Teams", "TimeAttack", "Rounds", "RoyalTimeAttack"), "Gamemode to launch for the match", 25);
 
 		// Init dynamics settings
@@ -640,6 +642,32 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Settings are loaded by Matchsettings file only.');
 				}
 			}
+		} else if (isset($setting) && $setting->belongsToClass($this)) {
+			if ($setting->setting == self::SETTING_MATCH_CUSTOM_GAMEMODE && $setting->value != "") {
+				$scriptfile = $this->maniaControl->getServer()->getDirectory()->getUserDataFolder() . DIRECTORY_SEPARATOR . "Scripts" . DIRECTORY_SEPARATOR . "Modes" . DIRECTORY_SEPARATOR . $setting->value;
+				if (!file_exists($scriptfile)) {
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Unable to find the gamemode file: "' . $setting->value . '"');
+				}
+			} else if ($setting->setting == self::SETTING_MODE_MAPLIST_FILE && $setting->value != "") {
+				$scriptfile = $this->maniaControl->getServer()->getDirectory()->getMapsFolder() ."MatchSettings" . DIRECTORY_SEPARATOR . $setting->value;
+				if (!file_exists($scriptfile)) {
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Unable to find the Maplist file: "' . $setting->value . '"');
+				}
+			} else if ($setting->setting == self::SETTING_MATCH_POST_MATCH_MAPLIST && $setting->value != "") {
+				$scriptfile = $this->maniaControl->getServer()->getDirectory()->getMapsFolder() ."MatchSettings" . DIRECTORY_SEPARATOR . $setting->value;
+				if (!file_exists($scriptfile)) {
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Unable to find the Post match Maplist file: "' . $setting->value . '"');
+				}
+			} else if ($setting->setting == self::SETTING_MODE_MAPS && $setting->value != "") {
+				$maps = explode(',', $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MODE_MAPS));
+				foreach ($maps as $map) {
+					try {
+						$this->maniaControl->getClient()->getMapInfo($map);
+					} catch (\Exception $e) {
+						$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Unable to find the map: "' . $map . '"');
+					}
+				}
+			}
 		}
 
 		if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL") && $this->maniaControl->getSettingManager()->getSettingValue($this->maniaControl->getSettingManager(), SettingManager::SETTING_ALLOW_UNLINK_SERVER)) {
@@ -759,6 +787,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 								$type = "integer";
 							} else if (strtolower($matches[3]) == "true" || strtolower($matches[3]) == "false") {
 								$type = "boolean";
+								if (strtolower($matches[3]) == "false") $defaultvalue = "";
 							} else {
 								$defaultvalue = str_replace(["'", '"'], "" , $matches[3]);
 								$type = "string";
@@ -780,9 +809,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					Logger::logError("Impossible to read custom game mode file");
 					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " Impossible to read custom game mode file");
 				}
-			} else {
-				Logger::logError("Custom game mode file doesn't exist");
-				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " Custom game mode file doesn't exist");
 			}
 		}
 
@@ -873,7 +899,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$this->currentgmbase = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE);
 			$this->currentcustomgm = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE);
 			$this->currentsettingmode = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE);
-			$maplist = "";
 
 			if  ($this->currentgmbase == "RoyalTimeAttack") {
 				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
@@ -1003,17 +1028,22 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	public function MatchEnd() {
 		try {
 			// Load TimeAttack gamemode if possible
-			if ($this->currentmap->mapType == "TrackMania\TM_Race") {
-				$scriptname = "Trackmania/TM_TimeAttack_Online.Script.txt" ;
-			} else if ($this->currentmap->mapType == "TrackMania\TM_Royal") {
-				$scriptname = "Trackmania/TM_RoyalTimeAttack_Online.Script.txt" ;
+			$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_POST_MATCH_MAPLIST);
+			if (is_file($this->maniaControl->getServer()->getDirectory()->getMapsFolder() . $maplist)) {
+				$this->maniaControl->getClient()->loadMatchSettings($maplist);
+			} else {
+				if ($this->currentmap->mapType == "TrackMania\TM_Race") {
+					$scriptname = "Trackmania/TM_TimeAttack_Online.Script.txt" ;
+				} else if ($this->currentmap->mapType == "TrackMania\TM_Royal") {
+					$scriptname = "Trackmania/TM_RoyalTimeAttack_Online.Script.txt" ;
+				}
+				if (isset($scriptname)) {
+					Logger::log("Loading script: " . $scriptname);
+					$this->maniaControl->getClient()->setScriptName($scriptname);
+				}
 			}
-			if (isset($scriptname)) {
-				Logger::log("Loading script: " . $scriptname);
-				$this->maniaControl->getClient()->setScriptName($scriptname);
-			}
+
 			// MYSQL DATA INSERT
-			$settings = json_encode($this->maniaControl->getClient()->getModeScriptSettings());
 			$mysqli = $this->maniaControl->getDatabase()->getMysqli();
 			$query = 'UPDATE `' . self::DB_MATCHESINDEX . '` SET `ended` = "' . time() . '" WHERE `matchid` = "' . $this->matchid . '"';
 			$mysqli->query($query);
@@ -1055,14 +1085,19 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Match stopped by an Admin!');
 
 			// Load TimeAttack gamemode if possible
-			if ($this->currentmap->mapType == "TrackMania\TM_Race") {
-				$scriptname = "Trackmania/TM_TimeAttack_Online.Script.txt" ;
-			} else if ($this->currentmap->mapType == "TrackMania\TM_Royal") {
-				$scriptname = "Trackmania/TM_RoyalTimeAttack_Online.Script.txt" ;
-			}
-			if (isset($scriptname)) {
-				Logger::log("Loading script: " . $scriptname);
-				$this->maniaControl->getClient()->setScriptName($scriptname);
+			$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_POST_MATCH_MAPLIST);
+			if (is_file($this->maniaControl->getServer()->getDirectory()->getMapsFolder() . $maplist)) {
+				$this->maniaControl->getClient()->loadMatchSettings($maplist);
+			} else {
+				if ($this->currentmap->mapType == "TrackMania\TM_Race") {
+					$scriptname = "Trackmania/TM_TimeAttack_Online.Script.txt" ;
+				} else if ($this->currentmap->mapType == "TrackMania\TM_Royal") {
+					$scriptname = "Trackmania/TM_RoyalTimeAttack_Online.Script.txt" ;
+				}
+				if (isset($scriptname)) {
+					Logger::log("Loading script: " . $scriptname);
+					$this->maniaControl->getClient()->setScriptName($scriptname);
+				}
 			}
 
 			$this->resetMatchVariables();
@@ -1313,19 +1348,24 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$this->postmatch = false;
 
 			Logger::log("Load PostMatch Game mode Settings");
-			$postmatchsettings = [
-				self::SETTING_MATCH_S_FORCELAPSNB => 0,
-				self::SETTING_MATCH_S_RESPAWNBEHAVIOUR => 0,
-				self::SETTING_MATCH_S_WARMUPNB => 0,
-				self::SETTING_MATCH_S_TIMELIMIT => 600
-			];
-			$currentgmsettings = $this->maniaControl->getClient()->getModeScriptSettings();
-			foreach ($postmatchsettings as $gamesettingname => $value) {
-				if (!array_key_exists($gamesettingname,$currentgmsettings)) {
-					unset($postmatchsettings[$gamesettingname]);
+			$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_POST_MATCH_MAPLIST);
+			if (is_file($this->maniaControl->getServer()->getDirectory()->getMapsFolder() . $maplist)) {
+				$this->maniaControl->getClient()->loadMatchSettings($maplist);
+			} else {
+				$postmatchsettings = [
+					self::SETTING_MATCH_S_FORCELAPSNB => 0,
+					self::SETTING_MATCH_S_RESPAWNBEHAVIOUR => 0,
+					self::SETTING_MATCH_S_WARMUPNB => 0,
+					self::SETTING_MATCH_S_TIMELIMIT => 600
+				];
+				$currentgmsettings = $this->maniaControl->getClient()->getModeScriptSettings();
+				foreach ($postmatchsettings as $gamesettingname => $value) {
+					if (!array_key_exists($gamesettingname,$currentgmsettings)) {
+						unset($postmatchsettings[$gamesettingname]);
+					}
 				}
+				$this->maniaControl->getClient()->setModeScriptSettings($postmatchsettings);
 			}
-			$this->maniaControl->getClient()->setModeScriptSettings($postmatchsettings);
 		}
 	}
 
