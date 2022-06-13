@@ -617,7 +617,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			} else if ($setting->setting == self::SETTING_MATCH_CUSTOM_GAMEMODE && $setting->value != $this->currentcustomgm) {
 				$setting->value = $this->currentcustomgm;
 				$this->maniaControl->getSettingManager()->saveSetting($setting);
-				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'You can\'t change the Custom Game Mode during a Match'); 
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'You can\'t change the Custom Gamemode during a Match'); 
 			} else if ($setting->setting == self::SETTING_MATCH_SETTINGS_MODE && $setting->value != $this->currentsettingmode) {
 				$setting->value = $this->currentsettingmode;
 				$this->maniaControl->getSettingManager()->saveSetting($setting);
@@ -806,8 +806,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					}
 					fclose($handle);
 				} else {
-					Logger::logError("Impossible to read custom game mode file");
-					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " Impossible to read custom game mode file");
+					Logger::logError("Impossible to read custom gamemode file");
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " Impossible to read custom gamemode file");
 				}
 			}
 		}
@@ -1347,7 +1347,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		} else if ($this->postmatch) {
 			$this->postmatch = false;
 
-			Logger::log("Load PostMatch Game mode Settings");
+			Logger::log("Load PostMatch Gamemode Settings");
 			$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_POST_MATCH_MAPLIST);
 			if (is_file($this->maniaControl->getServer()->getDirectory()->getMapsFolder() . $maplist)) {
 				$this->maniaControl->getClient()->loadMatchSettings($maplist);
