@@ -37,7 +37,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 3.8;
+	const PLUGIN_VERSION									= 3.9;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -415,7 +415,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSX, 0, "Position of the Pause Countdown (on X axis)", 15);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSY, 43, "Position of the Pause Countdown (on Y axis)", 15);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SETTINGS_MODE, array('All from the plugin', 'Maps from file & Settings from plugin', 'All from file'), "Loading mode for maps and match settings, depending on your needs", 20);
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_POST_MATCH_MAPLIST, "", "Load Mapfile after the match (empty to just load TA)", 20);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_POST_MATCH_MAPLIST, "", "Load Mapfile after the match (empty to just load TA on the same maps) (can be unstable)", 20);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Champion", "Cup", "Knockout", "Laps", "Teams", "TimeAttack", "Rounds", "RoyalTimeAttack"), "Gamemode to launch for the match", 25);
 
 		// Init dynamics settings
@@ -899,6 +899,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$this->currentgmbase = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE);
 			$this->currentcustomgm = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE);
 			$this->currentsettingmode = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE);
+			$maplist = "";
 
 			if  ($this->currentgmbase == "RoyalTimeAttack") {
 				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
