@@ -42,7 +42,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 * Constants
 	 */
 	const PLUGIN_ID											= 171;
-	const PLUGIN_VERSION									= 1.1;
+	const PLUGIN_VERSION									= 1.2;
 	const PLUGIN_NAME										= 'MatchManager Multiple Config Manager';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -267,6 +267,8 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 					$pluginclass = $this->maniaControl->getPluginManager()->getPlugin($plugin);
 					if ($pluginclass != null) {
 						foreach ($configs as $name => $value) {
+							// When loading setting, cache could be wrong compared to the data stored in the database. So force clear everytime to be sure to have the good value
+							$this->maniaControl->getSettingManager()->clearStorage();
 							$setting = $this->maniaControl->getSettingManager()->getSettingObject($pluginclass, $name);
 							if ($setting != null) {
 								if ($setting->value != $value) {
@@ -284,6 +286,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 				if ($someconfignotloaded) {
 					$this->maniaControl->getChat()->sendErrorToAdmins('One or more settings could not be imported');
 				}
+				$this->maniaControl->getSettingManager()->clearStorage();
 				$this->maniaControl->getChat()->sendSuccessToAdmins('MatchManager Config "' . $result[0]["name"] . '" loaded');
 			}
 		}
