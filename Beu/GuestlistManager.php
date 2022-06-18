@@ -7,22 +7,19 @@ use ManiaControl\Players\Player;
 use ManiaControl\Players\PlayerManager;
 use ManiaControl\Plugins\Plugin;
 use ManiaControl\ManiaControl;
-use ManiaControl\Settings\Setting;
-use ManiaControl\Settings\SettingManager;
-use \ManiaControl\Logger;
 
 /**
  * Plugin Description
  *
  * @author  Beu
- * @version 1.0
+ * @version 1.1
  */
 class GuestlistManager implements CommandListener, Plugin {
 	/*
 	 * Constants
 	 */
 	const PLUGIN_ID			= 154;
-	const PLUGIN_VERSION	= 1.0;
+	const PLUGIN_VERSION	= 1.1;
 	const PLUGIN_NAME		= 'Guestlist Manager';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -182,11 +179,21 @@ class GuestlistManager implements CommandListener, Plugin {
 	 * @param \ManiaControl\Players\Player $player
 	*/
 	public function doloadgl(Array $chat, Player $player) {
-		if (!empty(self::SETTING_GUESTLIST_FILE)) {
-			$this->maniaControl->getClient()->loadGuestList($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_GUESTLIST_FILE));
+		$text = explode(" ",$chat[1][2]);
+		if (count($text) > 1 && $text[1] != "") {
+			$guestlist = $text[1];
+
+			if (substr($guestlist , -4) != ".txt" && substr($guestlist , -4) != ".xml") {
+				$guestlist .= ".txt";
+			}
+		} else {
+			$guestlist = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_GUESTLIST_FILE);
+		}
+		if ($guestlist === "" || is_file($this->maniaControl->getServer()->getDirectory()->getUserDataFolder() . DIRECTORY_SEPARATOR . "Config" . DIRECTORY_SEPARATOR . $guestlist)) {
+			$this->maniaControl->getClient()->loadGuestList($guestlist);
 			$this->maniaControl->getChat()->sendSuccess( "Guestlist loaded!" , $player);
 		} else {
-			$this->maniaControl->getChat()->sendError( "Guestlist option empty" , $player);
+			$this->maniaControl->getChat()->sendError("Impossible to load the guestlist file" , $player);
 		}
 	}
 
@@ -197,12 +204,10 @@ class GuestlistManager implements CommandListener, Plugin {
 	 * @param \ManiaControl\Players\Player $player
 	*/
 	public function dosavegl(Array $chat, Player $player) {
-		if (!empty(self::SETTING_GUESTLIST_FILE)) {
-			$this->maniaControl->getClient()->saveGuestList($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_GUESTLIST_FILE));
-			$this->maniaControl->getChat()->sendSuccess( "Guestlist saved!" , $player);
-		} else {
-			$this->maniaControl->getChat()->sendError( "Guestlist option empty" , $player);
-		}
+		// impossible to save on a other file, idk why
+		$guestlist = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_GUESTLIST_FILE);
+		$this->maniaControl->getClient()->saveGuestList($guestlist);
+		$this->maniaControl->getChat()->sendSuccess( "Guestlist saved!" , $player);
 	}
 
 	/**
