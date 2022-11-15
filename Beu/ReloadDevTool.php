@@ -8,8 +8,6 @@ use ManiaControl\Players\PlayerManager;
 use ManiaControl\Callbacks\CallbackListener;
 use ManiaControl\Players\Player;
 
-use ManiaControl\Settings\Setting;
-use ManiaControl\Settings\SettingManager;
 use ManiaControl\Manialinks\ManialinkPageAnswerListener;
 
 use \Exception;
@@ -25,12 +23,14 @@ class ReloadDevTool implements ManialinkPageAnswerListener, CallbackListener, Pl
 	* Constants
 	*/
 	const PLUGIN_ID			= 165;
-	const PLUGIN_VERSION	= 1.0;
+	const PLUGIN_VERSION	= 1.1;
 	const PLUGIN_NAME		= 'ReloadDevTool';
 	const PLUGIN_AUTHOR		= 'Beu';
 
 	const SETTING_RELOAD_GAMEMODE		= 'Reload Gamemode';
 	const SETTING_GAMEMODE_TO_LOAD		= 'Gamemode to load';
+	const SETTING_RELOAD_PLUGIN			= 'Reload Server Plugin';
+	const SETTING_PLUGIN_TO_LOAD		= 'Server Plugin to load';
 	const SETTING_RESTART_MANIACONTROL	= 'Restart Maniacontrol';
 
 	/*
@@ -104,9 +104,11 @@ class ReloadDevTool implements ManialinkPageAnswerListener, CallbackListener, Pl
 	public function load(ManiaControl $maniaControl) {
 		$this->maniaControl = $maniaControl;
 
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_RELOAD_GAMEMODE, false, "");
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_GAMEMODE_TO_LOAD, "", 'File to load in UserData/Scripts/Modes/');
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_RESTART_MANIACONTROL, false, "");
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_RELOAD_GAMEMODE, false, "", 10);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_GAMEMODE_TO_LOAD, "", 'File to load in UserData/Scripts/Modes/', 11);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_RELOAD_PLUGIN, false, "", 20);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_PLUGIN_TO_LOAD, "", 'File to load in UserData/Scripts', 21);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_RESTART_MANIACONTROL, false, "", 30);
 
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
 		$this->maniaControl->getManialinkManager()->registerManialinkPageAnswerListener("ReloadDevTool_Reload", $this, 'handleReload');
@@ -150,6 +152,21 @@ class ReloadDevTool implements ManialinkPageAnswerListener, CallbackListener, Pl
 			} else {
 				Logger::logError('No Game mode to load');
 				$this->maniaControl->getChat()->sendErrorToAdmins("No Game mode to load");
+			}
+		}
+		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_RELOAD_PLUGIN)) {
+			$file = $this->maniaControl->getServer()->getDirectory()->getUserDataFolder() . "Scripts" . DIRECTORY_SEPARATOR  . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_PLUGIN_TO_LOAD);
+			if ($file && is_file($file)) {
+				try {
+					$this->maniaControl->getChat()->sendSuccess("Loading Script Plugin");
+					$this->maniaControl->getClient()->execute("SetServerPlugin", [true, $file]);
+				} catch (\Exception $e) {
+					Logger::logError($e->getMessage());
+					$this->maniaControl->getChat()->sendErrorToAdmins($e->getMessage());
+				}
+			} else {
+				Logger::logError('No Script Plugin to load');
+				$this->maniaControl->getChat()->sendErrorToAdmins("No Script Plugin to load");
 			}
 		}
 		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_RESTART_MANIACONTROL)) {
