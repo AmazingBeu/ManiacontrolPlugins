@@ -37,7 +37,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 3.9;
+	const PLUGIN_VERSION									= 3.10;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -73,49 +73,41 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	const SETTING_MODE_MAPLIST_FILE							= 'Maplist to use';
 
 	// Gamemodes Settings
-	const SETTING_MATCH_S_BESTLAPBONUSPOINTS				= 'S_BestLapBonusPoints';
 	const SETTING_MATCH_S_CHATTIME							= 'S_ChatTime';
 	const SETTING_MATCH_S_CUMULATEPOINTS					= 'S_CumulatePoints';
 	const SETTING_MATCH_S_DISABLEGIVEUP						= 'S_DisableGiveUp';
 	const SETTING_MATCH_S_EARLYENDMATCHCALLBACK				= 'S_EarlyEndMatchCallback';
 	const SETTING_MATCH_S_ELIMINATEDPLAYERSNBRANKS			= 'S_EliminatedPlayersNbRanks';
-	const SETTING_MATCH_S_ENDROUNDPOSTSCOREUPDATEDURATION	= 'S_EndRoundPostScoreUpdateDuration';
-	const SETTING_MATCH_S_ENDROUNDPRESCOREUPDATEDURATION	= 'S_EndRoundPreScoreUpdateDuration';
+	const SETTING_MATCH_S_ENABLEDOSSARDCOLOR				= 'S_EnableDossardColor';
 	const SETTING_MATCH_S_FINISHTIMEOUT						= 'S_FinishTimeout';
 	const SETTING_MATCH_S_FORCELAPSNB						= 'S_ForceLapsNb';
-	const SETTING_MATCH_S_FORCEWINNERSNB					= 'S_ForceWinnersNb';
+	const SETTING_MATCH_S_FORCEROADSPECTATORSNB				= 'S_ForceRoadSpectatorsNb';
 	const SETTING_MATCH_S_INFINITELAPS						= 'S_InfiniteLaps';
+	const SETTING_MATCH_S_MAPPOINTSLIMIT					= 'S_MapPointsLimit';
 	const SETTING_MATCH_S_MAPSPERMATCH						= 'S_MapsPerMatch';
 	const SETTING_MATCH_S_MATCHPOSITION						= 'S_MatchPosition';
+	const SETTING_MATCH_S_MATCHINFO							= 'S_MatchInfo';
+	const SETTING_MATCH_S_MATCHPOINTSLIMIT					= 'S_MatchPointsLimit';
 	const SETTING_MATCH_S_MAXPOINTSPERROUND					= 'S_MaxPointsPerRound';
 	const SETTING_MATCH_S_NBOFWINNERS						= 'S_NbOfWinners';
-	const SETTING_MATCH_S_PAUSEBEFOREROUNDNB				= 'S_PauseBeforeRoundNb';
-	const SETTING_MATCH_S_PAUSEDURATION						= 'S_PauseDuration';
 	const SETTING_MATCH_S_POINTSGAP							= 'S_PointsGap';
 	const SETTING_MATCH_S_POINTSLIMIT						= 'S_PointsLimit';
 	const SETTING_MATCH_S_POINTSREPARTITION					= 'S_PointsRepartition';
 	const SETTING_MATCH_S_RESPAWNBEHAVIOUR					= 'S_RespawnBehaviour';
-	const SETTING_MATCH_S_ROUNDSLIMIT						= 'S_RoundsLimit';
 	const SETTING_MATCH_S_ROUNDSPERMAP						= 'S_RoundsPerMap';
-	const SETTING_MATCH_S_ROUNDSWITHAPHASECHANGE			= 'S_RoundsWithAPhaseChange';
 	const SETTING_MATCH_S_ROUNDSWITHOUTELIMINATION			= 'S_RoundsWithoutElimination';
+	const SETTING_MATCH_S_SPONSORSURL						= 'S_SponsorsUrl';
+	const SETTING_MATCH_S_TEAMSURL							= 'S_TeamsUrl';
 	const SETTING_MATCH_S_TIMELIMIT							= 'S_TimeLimit';
-	const SETTING_MATCH_S_TIMEOUTPLAYERSNUMBER				= 'S_TimeOutPlayersNumber';
 	const SETTING_MATCH_S_USEALTERNATERULES					= 'S_UseAlternateRules';
 	const SETTING_MATCH_S_USECUSTOMPOINTSREPARTITION		= 'S_UseCustomPointsRepartition';
 	const SETTING_MATCH_S_USETIEBREAK						= 'S_UseTieBreak';
 	const SETTING_MATCH_S_WARMUPDURATION					= 'S_WarmUpDuration';
 	const SETTING_MATCH_S_WARMUPNB							= 'S_WarmUpNb';
 	const SETTING_MATCH_S_WARMUPTIMEOUT						= 'S_WarmUpTimeout';
-	const SETTING_MATCH_S_WINNERSRATIO						= 'S_WinnersRatio';
 
 	// RELATIONS BETWEEN GAMEMODE AND GAMEMODES SETTINGS
 	const GAMEMODES_LIST_SETTINGS = [
-		self::SETTING_MATCH_S_BESTLAPBONUSPOINTS => [ 
-			'gamemode' => ['Champion'],
-			'type' => 'integer',
-			'default' => 2,
-			'description' => 'Point bonus for who made the best lap time' ],
 		self::SETTING_MATCH_S_CHATTIME => [
 			'gamemode' => ['Global'],
 			'type' => 'integer',
@@ -127,12 +119,12 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => false,
 			'description' => 'Cumulate players points to the team score (false = 1 point to the winner team)' ],
 		self::SETTING_MATCH_S_DISABLEGIVEUP => [
-			'gamemode' => ['Champion', 'Laps'],
+			'gamemode' => ['Laps'],
 			'type' => 'boolean',
 			'default' => false,
 			'description' => 'Disable GiveUp' ],
 		self::SETTING_MATCH_S_EARLYENDMATCHCALLBACK => [
-			'gamemode' => ['Champion', 'Knockout'],
+			'gamemode' => ['Knockout', 'TMWTTeams'],
 			'type' => 'boolean',
 			'default' => true,
 			'description' => 'Send End Match Callback early (expert user only)' ],
@@ -141,18 +133,13 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'type' => 'string',
 			'default' => '4',
 			'description' => 'Rank at which one more player is eliminated per round (use coma to add more values. Ex COTD: 8,16,16)' ],
-		self::SETTING_MATCH_S_ENDROUNDPOSTSCOREUPDATEDURATION => [
-			'gamemode' => ['Champion'],
-			'type' => 'integer',
-			'default' => 5,
-			'description' => 'Time after score computed on scoreboard' ],
-		self::SETTING_MATCH_S_ENDROUNDPRESCOREUPDATEDURATION => [
-			'gamemode' => ['Champion'],
-			'type' => 'integer',
-			'default' => 5,
-			'description' => 'Time before score computed on scoreboard' ],
+		self::SETTING_MATCH_S_ENABLEDOSSARDCOLOR => [
+			'gamemode' => ['TMWTTeams'],
+			'type' => 'boolean',
+			'default' => true,
+			'description' => 'Apply color team on the dossard' ],
 		self::SETTING_MATCH_S_FINISHTIMEOUT => [
-			'gamemode' => ['Champion', 'Cup', 'Knockout', 'Laps', 'Teams', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TMWTTeams', 'Rounds'],
 			'type' => 'integer',
 			'default' => 10,
 			'description' => 'Time after the first finished (-1 = based on Author time)' ],
@@ -161,21 +148,36 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'type' => 'integer',
 			'default' => -1,
 			'description' => 'Force number of laps for laps maps (-1 = author, 0 for unlimited in TA)' ],
-		self::SETTING_MATCH_S_FORCEWINNERSNB => [
-			'gamemode' => ['Champion'],
+		self::SETTING_MATCH_S_FORCEROADSPECTATORSNB => [
+			'gamemode' => ['TMWTTeams'],
 			'type' => 'integer',
-			'default' => 0,
-			'description' => 'Force the number of players who will win points (0 = for use S_WinnersRatio)' ],
+			'default' => -1,
+			'description' => 'Force the number of spectators displayed on the border of the road' ],
 		self::SETTING_MATCH_S_INFINITELAPS => [
 			'gamemode' => ['Global'],
 			'type' => 'boolean',
 			'default' => false,
 			'description' => 'Never end a race in laps (override S_ForceLapsNb)' ],
+		self::SETTING_MATCH_S_MAPPOINTSLIMIT => [
+			'gamemode' => ['TMWTTeams'],
+			'type' => 'integer',
+			'default' => 10,
+			'description' => 'Track points limit' ],
 		self::SETTING_MATCH_S_MAPSPERMATCH => [
 			'gamemode' => ['Teams', 'Rounds'],
 			'type' => 'integer',
 			'default' => 3,
 			'description' => 'Number of maps maximum in the match' ],
+		self::SETTING_MATCH_S_MATCHINFO => [
+			'gamemode' => ['TMWTTeams'],
+			'type' => 'string',
+			'default' => "",
+			'description' => 'Match info displayed in the UI' ],
+		self::SETTING_MATCH_S_MATCHPOINTSLIMIT => [
+			'gamemode' => ['TMWTTeams'],
+			'type' => 'integer',
+			'default' => 4,
+			'description' => 'Match points limit' ],
 		self::SETTING_MATCH_S_MATCHPOSITION => [
 			'gamemode' => ['Knockout'],
 			'type' => 'integer',
@@ -191,28 +193,18 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'type' => 'integer',
 			'default' => 1,
 			'description' => 'Number of winners' ],
-		self::SETTING_MATCH_S_PAUSEBEFOREROUNDNB => [
-			'gamemode' => ['Champion'],
-			'type' => 'integer',
-			'default' => 0,
-			'description' => 'Run a pause before the round number (depend of S_PauseDuration) (0 = disabled)' ],
-		self::SETTING_MATCH_S_PAUSEDURATION => [
-			'gamemode' => ['Champion'],
-			'type' => 'integer',
-			'default' => 360,
-			'description' => 'Pause time in seconds (depend of S_PauseBeforeRoundNb) (0 = disabled)' ],
 		self::SETTING_MATCH_S_POINTSGAP => [
 			'gamemode' => ['Teams'],
 			'type' => 'integer',
 			'default' => 0,
 			'description' => 'Points Gap to win (depend of S_PointsLimit & S_UseTieBreak)' ],
 		self::SETTING_MATCH_S_POINTSLIMIT => [
-			'gamemode' => ['Champion', 'Cup', 'Teams', 'Rounds'],
+			'gamemode' => ['Cup', 'Teams', 'Rounds'],
 			'type' => 'integer',
 			'default' => 100,
 			'description' => 'Limit number of points (0 = unlimited for Ch & R)' ],
 		self::SETTING_MATCH_S_POINTSREPARTITION => [
-			'gamemode' => ['Champion', 'Cup', 'Knockout', 'Teams', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Teams', 'TMWTTeams', 'Rounds'],
 			'type' => 'string',
 			'default' => '10,6,4,3,2,1',
 			'description' => 'Point repartition from first to last' ],
@@ -221,36 +213,31 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'type' => 'integer',
 			'default' => [0,1,2,3,4,5],
 			'description' => 'Respawn behavior (0 = GM setting, 1 = normal, 2 = do nothing, 3 = DNF before 1st CP, 4 = always DNF, 5 = never DNF)' ],
-		self::SETTING_MATCH_S_ROUNDSLIMIT => [
-			'gamemode' => ['Champion'],
-			'type' => 'integer',
-			'default' => 6,
-			'description' => 'Number of rounds to play before finding a winner of the step' ],
 		self::SETTING_MATCH_S_ROUNDSPERMAP => [
-			'gamemode' => ['Champion', 'Cup', 'Knockout', 'Teams', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Teams', 'Rounds'],
 			'type' => 'integer',
 			'default' => 5,
 			'description' => 'Number of rounds par map (0 = unlimited)' ],
-		self::SETTING_MATCH_S_ROUNDSWITHAPHASECHANGE => [
-			'gamemode' => ['Champion'],
-			'type' => 'string',
-			'default' => '3,5',
-			'description' => 'Rounds with a Phase change (Openning, Semi-Final, Final)' ],
 		self::SETTING_MATCH_S_ROUNDSWITHOUTELIMINATION => [
 			'gamemode' => ['Knockout'],
 			'type' => 'integer',
 			'default' => 1,
 			'description' => 'Rounds without elimination (like a Warmup, but just for the first map)' ],
+		self::SETTING_MATCH_S_SPONSORSURL => [
+			'gamemode' => ['TMWTTeams'],
+			'type' => 'string',
+			'default' => "",
+			'description' => 'URLs separated by a space' ],
+		self::SETTING_MATCH_S_TEAMSURL => [
+			'gamemode' => ['TMWTTeams'],
+			'type' => 'string',
+			'default' => "",
+			'description' => 'URL where to get the teams info' ],
 		self::SETTING_MATCH_S_TIMELIMIT => [
-			'gamemode' => ['Champion', 'Laps', 'TimeAttack', 'RoyalTimeAttack'],
+			'gamemode' => ['Laps', 'TimeAttack', 'RoyalTimeAttack'],
 			'type' => 'integer',
 			'default' => 600,
 			'description' => 'Time limit (0 = unlimited)' ],
-		self::SETTING_MATCH_S_TIMEOUTPLAYERSNUMBER => [
-			'gamemode' => ['Champion'],
-			'type' => 'integer',
-			'default' => 0,
-			'description' => 'Number of players who must finish before starting S_FinishTimeout (0 = S_ForceWinnersNb)' ],
 		self::SETTING_MATCH_S_USEALTERNATERULES => [
 			'gamemode' => ['Teams'],
 			'type' => 'boolean',
@@ -262,30 +249,25 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => false,
 			'description' => 'Use S_PointsRepartition (instead of rules defined by S_UseAlternateRules)' ],
 		self::SETTING_MATCH_S_USETIEBREAK => [
-			'gamemode' => ['Champion', 'Teams', 'Rounds'],
+			'gamemode' => ['Teams', 'Rounds'],
 			'type' => 'boolean',
 			'default' => false,
 			'description' => 'Use Tie Break (Only available when S_MapsPerMatch > 1)' ],
 		self::SETTING_MATCH_S_WARMUPDURATION => [
-			'gamemode' => ['Champion', 'Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWTTeams', 'Rounds'],
 			'type' => 'integer',
 			'default' => -1,
 			'description' => 'Duration of 1 Warm Up in sec (-1 = one round, 0 = based on Author time)' ],
 		self::SETTING_MATCH_S_WARMUPNB => [
-			'gamemode' => ['Champion', 'Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWTTeams', 'Rounds'],
 			'type' => 'integer',
 			'default' => 1,
 			'description' => 'Number of Warm Up' ],
 		self::SETTING_MATCH_S_WARMUPTIMEOUT => [
-			'gamemode' => ['Champion', 'Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWTTeams', 'Rounds'],
 			'type' => 'integer',
 			'default' => -1,
-			'description' => 'Time after the first finished the WarmUP (-1 = based on Author time, only when S_WarmUpDuration = -1)' ],
-		self::SETTING_MATCH_S_WINNERSRATIO => [
-			'gamemode' => ['Champion'],
-			'type' => 'float',
-			'default' => 0.5,
-			'description' => 'Ratio of players who will win points' ]
+			'description' => 'Time after the first finished the WarmUP (-1 = based on Author time, only when S_WarmUpDuration = -1)' ]
 	];
 
 	const SETTINGS_MODE_LIST = [
@@ -416,7 +398,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSY, 43, "Position of the Pause Countdown (on Y axis)", 15);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SETTINGS_MODE, array('All from the plugin', 'Maps from file & Settings from plugin', 'All from file'), "Loading mode for maps and match settings, depending on your needs", 20);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_POST_MATCH_MAPLIST, "", "Load Mapfile after the match (empty to just load TA on the same maps) (can be unstable)", 20);
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Champion", "Cup", "Knockout", "Laps", "Teams", "TimeAttack", "Rounds", "RoyalTimeAttack"), "Gamemode to launch for the match", 25);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Cup", "Knockout", "Laps", "Teams", "TimeAttack", "TMWTTeams", "Rounds", "RoyalTimeAttack"), "Gamemode to launch for the match", 25);
 
 		// Init dynamics settings
 		$this->updateSettings();
@@ -732,10 +714,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->postmatch		= true;
 		$this->matchid			= "";
 
-		$this->nbwinners 		= 0;
-
 		$this->settings_nbroundsbymap	= 5;
-		$this->settings_nbwinner		= 2;
+		$this->settings_nbwinners		= 2;
 		$this->settings_nbmapsbymatch	= 0;
 		$this->settings_pointlimit		= 100;
 
@@ -861,9 +841,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		} else {
 			$this->settings_nbroundsbymap = 1;
 		}
-		if ($this->currentgmbase == "Champion") {
-			$this->settings_nbmapsbymatch	= (int) $this->currentgmsettings[self::SETTING_MATCH_S_ROUNDSLIMIT];
-		} elseif (isset($this->currentgmsettings[self::SETTING_MATCH_S_MAPSPERMATCH])) {	
+		if (isset($this->currentgmsettings[self::SETTING_MATCH_S_MAPSPERMATCH])) {	
 			$this->settings_nbmapsbymatch	= (int) $this->currentgmsettings[self::SETTING_MATCH_S_MAPSPERMATCH];
 		}
 	}
@@ -1553,6 +1531,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 					//$rank = 1;
 					foreach ($results as $result) {
+						/** @var \ManiaControl\Callbacks\Structures\TrackMania\Models\PlayerScore $result */
 						$rank 					= $result->getRank();
 						$player					= $result->getPlayer();
 						$matchpoints			= $result->getMatchPoints();
