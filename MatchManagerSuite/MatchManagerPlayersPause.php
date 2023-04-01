@@ -38,7 +38,7 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	 * Constants
 	 */
 	const PLUGIN_ID											= 159;
-	const PLUGIN_VERSION									= 1.2;
+	const PLUGIN_VERSION									= 1.3;
 	const PLUGIN_NAME										= 'MatchManager Players Pause';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -210,6 +210,9 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 					$this->closePauseWidget();
 					Logger::log('Pause requested by players');
 					if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_PAUSE_WAIT_END_ROUND)) {
+						if ($this->maniaControl->getSettingManager()->getSettingValue($this->maniaControl, MatchManagerCore::SETTING_MATCH_PAUSE_DURATION) <= 0) {
+							$this->maniaControl->getChat()->sendInformation($this->chatprefix . 'Ask the admins to resume the match');
+						}
 						$this->MatchManagerCore->setNadeoPause();
 					} else {
 						$this->maniaControl->getChat()->sendInformation($this->chatprefix . 'Pause will start at the end of this round');
@@ -243,12 +246,12 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 					$this->closePauseWidget($player->login);
 				} else if (!$player->isSpectator && !isset($this->playerspausestate[$player->login])) {
 					$this->playerspausestate[$player->login] = 0;
-					$this->maniaControl->getManialinkManager()->sendManialink($this->MLPauseNotAsked, $player->login);
+					$this->maniaControl->getManialinkManager()->sendManialink($this->MLPauseNotAsked, $player->login, 0, false, false);
 				} else if (!$player->isSpectator && isset($this->playerspausestate[$player->login])) {
 					if ($this->playerspausestate[$player->login] == 1) {
-						$this->maniaControl->getManialinkManager()->sendManialink($this->MLPauseAsked, $player->login);
+						$this->maniaControl->getManialinkManager()->sendManialink($this->MLPauseAsked, $player->login, 0, false, false);
 					} else {
-						$this->maniaControl->getManialinkManager()->sendManialink($this->MLPauseNotAsked, $player->login);
+						$this->maniaControl->getManialinkManager()->sendManialink($this->MLPauseNotAsked, $player->login, 0, false, false);
 					}
 				}
 			}
@@ -314,6 +317,10 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 
 	public function handleBeginRoundCallback() {
 		if ($this->LaunchPauseAtTheEnd) {
+			if ($this->maniaControl->getSettingManager()->getSettingValue($this->maniaControl, MatchManagerCore::SETTING_MATCH_PAUSE_DURATION) <= 0) {
+				$this->maniaControl->getChat()->sendInformation($this->chatprefix . 'Ask the admins to resume the match');
+			}
+
 			$this->LaunchPauseAtTheEnd = false;
 			$this->MatchManagerCore->setNadeoPause();
 		} else {
