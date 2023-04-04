@@ -37,7 +37,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 4.0;
+	const PLUGIN_VERSION									= 4.1;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -476,7 +476,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			`matchid` VARCHAR(100) NOT NULL,
 			`timestamp` INT(10) NOT NULL,
 			`rank` INT(4) NOT NULL,
-			`login` VARCHAR(30) NOT NULL,
+			`login` VARCHAR(36) NOT NULL,
 			`matchpoints` INT(10) NOT NULL,
 			`mappoints` INT(10) NOT NULL,
 			`roundpoints` INT(10) NOT NULL,
@@ -530,6 +530,20 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						CHANGE `points` `matchpoints` INT(10) NOT NULL,
 						ADD COLUMN `mappoints` INT(10) NOT NULL AFTER `matchpoints`,
 						ADD COLUMN `roundpoints` INT(10) NOT NULL AFTER `mappoints`;
+				END IF;';
+		$mysqli->query($query);
+		if ($mysqli->error) {
+			trigger_error($mysqli->error, E_USER_ERROR);
+		}
+		$query = 'IF NOT EXISTS( SELECT NULL
+					FROM INFORMATION_SCHEMA.COLUMNS
+				WHERE `table_name` = "' . self::DB_ROUNDSDATA . '"
+					AND `table_schema` = "' . $mysqliconfig->name . '"
+					AND `column_name` = "login"
+					AND `CHARACTER_MAXIMUM_LENGTH` = 36)  THEN
+
+				ALTER TABLE `' . self::DB_ROUNDSDATA . '`
+					MODIFY `login` VARCHAR(36) NOT NULL;
 				END IF;';
 		$mysqli->query($query);
 		if ($mysqli->error) {
@@ -714,7 +728,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->postmatch		= true;
 		$this->matchid			= "";
 
-		$this->settings_nbroundsbymap	= 5;
+		$this->settings_nbroundsbymap	= -1;
 		$this->settings_nbwinners		= 2;
 		$this->settings_nbmapsbymatch	= 0;
 		$this->settings_pointlimit		= 100;
@@ -839,7 +853,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		if (isset($this->currentgmsettings[self::SETTING_MATCH_S_ROUNDSPERMAP])) {
 			$this->settings_nbroundsbymap	= (int) $this->currentgmsettings[self::SETTING_MATCH_S_ROUNDSPERMAP];
 		} else {
-			$this->settings_nbroundsbymap = 1;
+			$this->settings_nbroundsbymap = -1;
 		}
 		if (isset($this->currentgmsettings[self::SETTING_MATCH_S_MAPSPERMATCH])) {	
 			$this->settings_nbmapsbymatch	= (int) $this->currentgmsettings[self::SETTING_MATCH_S_MAPSPERMATCH];
@@ -1482,7 +1496,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'The match is currently on $<$F00pause$>!');
 						Logger::log("Pause");
 					} else {
-						if ($this->settings_nbroundsbymap != 1) {
+						if ($this->settings_nbroundsbymap > 1) {
 							$this->maniaControl->getChat()->sendInformation($this->chatprefix . '$o$iRound: ' . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
 							Logger::log("Round: " . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
 						}
