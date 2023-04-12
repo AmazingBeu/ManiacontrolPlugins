@@ -37,7 +37,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 4.1;
+	const PLUGIN_VERSION									= 4.2;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -321,7 +321,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	private $settings_pointlimit	= 100;
 
 	private $currentscore			= array();
-	private $preendroundscore		= array();
+	/** @var OnScoresStructure|null $preendroundscore */
+	private $preendroundscore		= null;
 	private $currentteamsscore		= array();
 	private $pausetimer				= 0;
 	private $pauseon				= false;
@@ -1527,7 +1528,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			} elseif ($structure->getSection() == "EndMap" && $this->hidenextmaps && isset($this->maps[$this->nbmaps])) {
 				$this->maniaControl->getClient()->addMap($this->maps[$this->nbmaps]);
 			} elseif ($structure->getSection() == "PreEndRound") {
-				$this->preendroundscore = $structure->getPlayerScores();
+				$this->preendroundscore = $structure;
 			} elseif ($structure->getSection() == "EndRound") {
 				$timestamp = time();
 
@@ -1542,6 +1543,14 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
 						Logger::Log("No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
 					}
+
+					$preendroundplayersscore = [];
+					$preendroundteamsscore = [];
+					if ($this->preendroundscore !== null) {
+						$preendroundplayersscore = $this->preendroundscore->getPlayerScores();
+						$preendroundteamsscore = $this->preendroundscore->getTeamScores();;
+					}
+					$this->preendroundscore = null;
 
 					//$rank = 1;
 					foreach ($results as $result) {
@@ -1558,19 +1567,18 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						$prevracetime			= $result->getPrevRaceTime();
 						$prevracecheckpoints	= implode(",", $result->getPrevRaceCheckpoints());
 
-						if (count($this->preendroundscore) > 0) {
-							foreach ($this->preendroundscore as $k => $preendroundresult) {
-								if ($preendroundresult->getPlayer() === $player) {
-									if ($roundpoints == 0 && $preendroundresult->getRoundPoints() != 0) {
-										$roundpoints = $preendroundresult->getRoundPoints();
-									}
-									if ($mappoints == 0 && $preendroundresult->getMapPoints() != 0) {
-										$mappoints = $preendroundresult->getMapPoints();
-									}
+						if (count($preendroundplayersscore) > 0) {
+							$preendroundarray = array_filter($preendroundplayersscore, function ($e) use ($player) { return $e->getPlayer() === $player ; });
 
-									unset($this->preendroundscore[$k]);
-									break;
+							foreach ($preendroundarray as $key => $preendround) {
+								if ($roundpoints == 0 && $preendround->getRoundPoints() != 0) {
+									$roundpoints = $preendround->getRoundPoints();
 								}
+								if ($mappoints == 0 && $preendround->getMapPoints() != 0) {
+									$mappoints = $preendround->getMapPoints();
+								}
+								unset($preendroundplayersscore[$key]);
+								break;
 							}
 						}
 
@@ -1597,6 +1605,21 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 							$mappoints				= $teamresult->getMapPoints();
 							$roundpoints			= $teamresult->getRoundPoints();
 
+							if (count($preendroundteamsscore) > 0) {
+								$preendroundarray = array_filter($preendroundteamsscore, function ($e) use ($teamid) { return $e->getTeamId() === $teamid ; });
+	
+								foreach ($preendroundarray as $key => $preendround) {
+									if ($roundpoints == 0 && $preendround->getRoundPoints() != 0) {
+										$roundpoints = $preendround->getRoundPoints();
+									}
+									if ($mappoints == 0 && $preendround->getMapPoints() != 0) {
+										$mappoints = $preendround->getMapPoints();
+									}
+									unset($preendroundteamsscore[$key]);
+									break;
+								}
+							}
+
 							$this->currentteamsscore = array_merge($this->currentteamsscore, array(
 								array($rank, $teamid, $teamname, $matchpoints, $mappoints, $roundpoints)
 							));
@@ -1607,7 +1630,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					//
 					// End Round Routines
 					//
-					$this->preendroundscore = array();
 					if (!$this->pauseon && !$this->skipround) {
 						if ($this->currentgmbase != "Cup") {
 							$this->nbrounds++;
