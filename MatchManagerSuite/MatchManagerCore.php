@@ -37,7 +37,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 4.2;
+	const PLUGIN_VERSION									= 4.3;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -510,13 +510,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 		// Update table data
 		$mysqliconfig = $this->maniaControl->getDatabase()->getConfig();
-		$query = 'IF NOT EXISTS( SELECT NULL
-						FROM INFORMATION_SCHEMA.COLUMNS
-					WHERE `table_name` = "' . self::DB_ROUNDSDATA . '"
-						AND `table_schema` = "' . $mysqliconfig->name . '"
-						AND `column_name` = "mappoints")  THEN
 
-					ALTER TABLE `' . self::DB_ROUNDSDATA . '`
+		$query = 'SELECT NULL FROM INFORMATION_SCHEMA.COLUMNS WHERE `table_schema` = "' . $mysqliconfig->name . '" AND `table_name` = "' . self::DB_ROUNDSDATA . '" AND `column_name` = "mappoints";';
+		if ($mysqli->query($query)->num_rows === 0) {
+			$query = 'ALTER TABLE `' . self::DB_ROUNDSDATA . '`
 						ADD COLUMN `mappoints` INT(10) NOT NULL AFTER `matchpoints`,
 						CHANGE `time` `bestracetime` INT(10) NOT NULL,
 						ADD COLUMN `bestracecheckpoints` VARCHAR(1000) NOT NULL AFTER `bestracetime`,
@@ -524,31 +521,31 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						ADD COLUMN `bestlapcheckpoints` VARCHAR(1000) NOT NULL AFTER `bestlaptime`,
 						ADD COLUMN `prevracetime` INT(10) NOT NULL AFTER `bestlapcheckpoints`,
 						ADD COLUMN `prevracecheckpoints` VARCHAR(1000) NOT NULL AFTER `prevracetime`,
-						MODIFY `teamid` INT(3) NOT NULL;
-					ALTER TABLE `' . self::DB_TEAMSDATA . '`
+						MODIFY `teamid` INT(3) NOT NULL;';
+			$mysqli->query($query);
+			if ($mysqli->error) {
+				trigger_error($mysqli->error, E_USER_ERROR);
+			}
+
+			$query = 'ALTER TABLE `' . self::DB_TEAMSDATA . '`
 						ADD COLUMN `rank` INT(3) NOT NULL,
 						MODIFY `id` INT(3) NOT NULL,
 						CHANGE `points` `matchpoints` INT(10) NOT NULL,
 						ADD COLUMN `mappoints` INT(10) NOT NULL AFTER `matchpoints`,
-						ADD COLUMN `roundpoints` INT(10) NOT NULL AFTER `mappoints`;
-				END IF;';
-		$mysqli->query($query);
-		if ($mysqli->error) {
-			trigger_error($mysqli->error, E_USER_ERROR);
+						ADD COLUMN `roundpoints` INT(10) NOT NULL AFTER `mappoints`;';
+			$mysqli->query($query);
+			if ($mysqli->error) {
+				trigger_error($mysqli->error, E_USER_ERROR);
+			}
 		}
-		$query = 'IF NOT EXISTS( SELECT NULL
-					FROM INFORMATION_SCHEMA.COLUMNS
-				WHERE `table_name` = "' . self::DB_ROUNDSDATA . '"
-					AND `table_schema` = "' . $mysqliconfig->name . '"
-					AND `column_name` = "login"
-					AND `CHARACTER_MAXIMUM_LENGTH` = 36)  THEN
 
-				ALTER TABLE `' . self::DB_ROUNDSDATA . '`
-					MODIFY `login` VARCHAR(36) NOT NULL;
-				END IF;';
-		$mysqli->query($query);
-		if ($mysqli->error) {
-			trigger_error($mysqli->error, E_USER_ERROR);
+		$query = 'SELECT NULL FROM INFORMATION_SCHEMA.COLUMNS WHERE `table_schema` = "' . $mysqliconfig->name . '" AND `table_name` = "' . self::DB_ROUNDSDATA . '" AND `column_name` = "login" AND `CHARACTER_MAXIMUM_LENGTH` = 36;';
+		if ($mysqli->query($query)->num_rows === 0) {
+			$query = 'ALTER TABLE `' . self::DB_ROUNDSDATA . '` MODIFY `login` VARCHAR(36) NOT NULL;';
+			$mysqli->query($query);
+			if ($mysqli->error) {
+				trigger_error($mysqli->error, E_USER_ERROR);
+			}
 		}
 	}
 
