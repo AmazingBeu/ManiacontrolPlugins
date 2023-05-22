@@ -3,6 +3,7 @@
 namespace Beu;
 
 use ManiaControl\Commands\CommandListener;
+use ManiaControl\Logger;
 use ManiaControl\Players\Player;
 use ManiaControl\Players\PlayerManager;
 use ManiaControl\Plugins\Plugin;
@@ -19,7 +20,7 @@ class GuestlistManager implements CommandListener, Plugin {
 	 * Constants
 	 */
 	const PLUGIN_ID			= 154;
-	const PLUGIN_VERSION	= 1.1;
+	const PLUGIN_VERSION	= 1.2;
 	const PLUGIN_NAME		= 'Guestlist Manager';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -85,7 +86,10 @@ class GuestlistManager implements CommandListener, Plugin {
 		$this->maniaControl->getCommandManager()->registerCommandListener('loadgl', $this, 'doloadgl', true, 'Load the guestlist');
 		$this->maniaControl->getCommandManager()->registerCommandListener('cleangl', $this, 'docleangl', true, 'Clean the guestlist');
 
-		return true;
+		$guestlist = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_GUESTLIST_FILE);
+		if ($guestlist === "" || is_file($this->maniaControl->getServer()->getDirectory()->getUserDataFolder() . DIRECTORY_SEPARATOR . "Config" . DIRECTORY_SEPARATOR . $guestlist)) {
+			$this->maniaControl->getClient()->loadGuestList($guestlist);
+		}
 	}
 
 	/**
@@ -204,10 +208,33 @@ class GuestlistManager implements CommandListener, Plugin {
 	 * @param \ManiaControl\Players\Player $player
 	*/
 	public function dosavegl(Array $chat, Player $player) {
-		// impossible to save on a other file, idk why
-		$guestlist = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_GUESTLIST_FILE);
-		$this->maniaControl->getClient()->saveGuestList($guestlist);
-		$this->maniaControl->getChat()->sendSuccess( "Guestlist saved!" , $player);
+		try {
+			$guestlist = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_GUESTLIST_FILE);
+			
+			if ($guestlist !== "") {
+				$filepath = $this->maniaControl->getServer()->getDirectory()->getUserDataFolder() . DIRECTORY_SEPARATOR . "Config" . DIRECTORY_SEPARATOR  . $guestlist;
+
+				if (!is_file($filepath)) {
+					file_put_contents($filepath, '<?xml version="1.0" encoding="utf-8" ?><guestlist></guestlist>');
+				}
+			}
+
+			// Workaround when the file was never loaded by the server
+			$currentguestlist = $this->maniaControl->getClient()->getGuestList();
+			$this->maniaControl->getClient()->loadGuestList($guestlist);
+
+			$this->maniaControl->getClient()->cleanGuestList();
+			foreach ($currentguestlist as $player) {
+				$this->maniaControl->getClient()->addGuest($player->login);
+			}
+
+			$this->maniaControl->getClient()->saveGuestList($guestlist);
+
+			$this->maniaControl->getChat()->sendSuccess( "Guestlist saved!" , $player);
+		} catch (\Exception $e) {
+			Logger::logError("Impossible to save guestlist: " . $e->getMessage());
+			$this->maniaControl->getChat()->sendError("Impossible to save guestlist: " . $e->getMessage(), $player);
+		}
 	}
 
 	/**
