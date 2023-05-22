@@ -20,7 +20,7 @@ class GuestlistManager implements CommandListener, Plugin {
 	 * Constants
 	 */
 	const PLUGIN_ID			= 154;
-	const PLUGIN_VERSION	= 1.2;
+	const PLUGIN_VERSION	= 1.3;
 	const PLUGIN_NAME		= 'Guestlist Manager';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -224,13 +224,13 @@ class GuestlistManager implements CommandListener, Plugin {
 			$this->maniaControl->getClient()->loadGuestList($guestlist);
 
 			$this->maniaControl->getClient()->cleanGuestList();
-			foreach ($currentguestlist as $player) {
-				$this->maniaControl->getClient()->addGuest($player->login);
+			foreach ($currentguestlist as $guest) {
+				$this->maniaControl->getClient()->addGuest($guest->login);
 			}
 
 			$this->maniaControl->getClient()->saveGuestList($guestlist);
 
-			$this->maniaControl->getChat()->sendSuccess( "Guestlist saved!" , $player);
+			$this->maniaControl->getChat()->sendSuccess("Guestlist saved!" , $player);
 		} catch (\Exception $e) {
 			Logger::logError("Impossible to save guestlist: " . $e->getMessage());
 			$this->maniaControl->getChat()->sendError("Impossible to save guestlist: " . $e->getMessage(), $player);
