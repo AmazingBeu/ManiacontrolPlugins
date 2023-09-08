@@ -6,11 +6,12 @@
 !MatchManagerSuite/*
 !Beu
 !Beu/AFKNotifier.php
+!Beu/BeuDonationButton.php
 !Beu/ChatAdminColorer.php
-!Beu/ReloadDevTool.php
+!Beu/ClimbTheMap.php
+!Beu/GameModeLoader.php
 !Beu/GuestlistManager.php
 !Beu/MoreModesTools.php
+!Beu/ReloadDevTool.php
 !Beu/SimpleChatColorer.php
 !Beu/SimpleSkinsRemover.php
-!Beu/BeuDonationButton.php
-!Beu/GameModeLoader.php
