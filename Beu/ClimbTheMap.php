@@ -10,6 +10,7 @@ use ManiaControl\Plugins\Plugin;
 use ManiaControl\Players\PlayerManager;
 use ManiaControl\Callbacks\CallbackListener;
 use ManiaControl\Callbacks\Callbacks;
+use ManiaControl\Callbacks\Structures\TrackMania\OnWayPointEventStructure;
 use ManiaControl\Commands\CommandListener;
 use ManiaControl\Manialinks\LabelLine;
 use ManiaControl\Manialinks\ManialinkManager;
@@ -19,6 +20,7 @@ use ManiaControl\Callbacks\TimerListener;
 
 use ManiaControl\Manialinks\ManialinkPageAnswerListener;
 use ManiaControl\Maps\Map;
+use ManiaControl\Utils\Formatter;
 
 /**
  * ClimbTheMap
@@ -57,6 +59,7 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 	private $maniaControl	= null;
 	private $manialink		= "";
 	private $wraltitude		= 0;
+	private $wrtime			= 0;
 
 	/**
 	 * @see \ManiaControl\Plugins\Plugin::prepare()
@@ -109,7 +112,7 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::AFTERINIT, $this, 'handleAfterInit');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_STARTROUNDSTART, $this, 'handleStartRound');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_ONFINISHLINE, $this, 'handleFinishCallback');
 
 		$this->maniaControl->getCallbackManager()->registerScriptCallbackListener(self::CB_UPDATEPBS, $this, 'handleUpdatePBs');
 
@@ -127,7 +130,8 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 			`mapIndex` INT(11) NOT NULL,
 			`login` varchar(36) NOT NULL,
 			`altitude` INT(11) NOT NULL,
-			`time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			`time` int(11) DEFAULT -1,
+			`date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 				PRIMARY KEY (`index`),
 				UNIQUE KEY `map_player` (`mapIndex`,`login`)
 			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;';
@@ -169,10 +173,31 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 		$wr = $this->getWR($map->index);
 		if ($wr !== null) {
 			$this->wraltitude = $wr[1];
-			$this->maniaControl->getClient()->triggerModeScriptEvent(self::M_SETWR, [$wr[0], strval($wr[1])]);
+			$this->wrtime = $wr[2];
+			$this->maniaControl->getClient()->triggerModeScriptEvent(self::M_SETWR, [$wr[0], strval($wr[1]), strval($wr[2])]);
 		} else {
 			$this->wraltitude = 0;
 		}
+	}
+
+	public function handleFinishCallback(OnWayPointEventStructure $structure) {
+		$map = $this->maniaControl->getMapManager()->getCurrentMap();
+		if ($map === null) return;
+		$mapIndex = $map->index;
+		$login = $structure->getLogin();
+		$time = $structure->getRaceTime();
+
+		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
+		$stmt = $mysqli->prepare("INSERT INTO `" . self::DB_CLIMBTHEMAP . "` (`mapIndex`, `login`, `time`, `altitude`) 
+			VALUES (?, ?, ?, -1) ON DUPLICATE KEY UPDATE
+			`time` = IF(`time` < 0 OR `time` > VALUES(`time`),
+				VALUES(`time`),
+				`time`);"); 
+		$stmt->bind_param('isi', $mapIndex, $login, $time);
+		$stmt->execute();
+
+		// Reset manialink cache
+		$this->manialink = "";
 	}
 
 	public function handleUpdatePBs(array $data) {
@@ -191,14 +216,8 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 			$stmt->bind_param('iss', $mapIndex, $login, $altitude);
 			foreach ($json as $login => $altitude) {
 				$stmt->execute();
-
-				if ($this->wraltitude < $altitude) {
-					$this->wraltitude = $altitude;
-				}
 			}
 			$mysqli->commit();
-
-			
 
 			// Reset manialink cache
 			$this->manialink = "";
@@ -212,15 +231,16 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 		$wr = $this->getWR($map->index);
 
 		// Update WR if done on an another server
-		if ($wr !== null && $this->wraltitude < $wr[1]) {
+		if ($wr !== null && ($this->wraltitude !== $wr[1] || $this->wrtime !== $wr[2])) {
 			$this->wraltitude = $wr[1];
-			$this->maniaControl->getClient()->triggerModeScriptEvent(self::M_SETWR, [$wr[0], strval($wr[1])]);
+			$this->wrtime = $wr[2];
+			$this->maniaControl->getClient()->triggerModeScriptEvent(self::M_SETWR, [$wr[0], strval($wr[1]), strval($wr[2])]);
 		}
 	}
 
 
 	private function getPlayersPB(int $mapIndex, array $logins) {
-		if (count($logins) === 0) return;
+		if (count($logins) === 0) return [];
 		$return = [];
 		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
 
@@ -242,7 +262,15 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 	private function getWR(int $mapIndex) {
 		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
 
-		$stmt = $mysqli->prepare('SELECT login,altitude FROM `' . self::DB_CLIMBTHEMAP . '` WHERE `mapIndex` = ? ORDER BY altitude DESC, time ASC LIMIT 1;');
+		$stmt = $mysqli->prepare('SELECT `login`,`altitude`,`time` FROM `' . self::DB_CLIMBTHEMAP . '`
+			WHERE `mapIndex` = ?
+			ORDER BY 
+				CASE 
+					WHEN `time` > 0 THEN `time` 
+					ELSE `altitude`
+				END DESC,
+			`date` ASC
+			LIMIT 1;');
 		$stmt->bind_param('i', $mapIndex);
 		if (!$stmt->execute()) {
 			trigger_error('Error executing MySQL query: ' . $stmt->error);
@@ -254,7 +282,7 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 
 				$player = $this->maniaControl->getPlayerManager()->getPlayer($data["login"]);
 				if ($player !== null) {
-					return [$player->nickname, $data["altitude"]];
+					return [$player->nickname, $data["altitude"], $data["time"]];
 				}	
 			}
 
@@ -269,11 +297,16 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 
 		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
 
-		$stmt = $mysqli->prepare('SELECT ctm.index,ctm.login,p.nickname,ctm.altitude,ctm.time FROM `' . self::DB_CLIMBTHEMAP . '` ctm
+		$stmt = $mysqli->prepare('SELECT ctm.index,ctm.login,p.nickname,ctm.altitude,ctm.time,ctm.date FROM `' . self::DB_CLIMBTHEMAP . '` ctm
 			LEFT JOIN `' . PlayerManager::TABLE_PLAYERS . '` p
 			ON ctm.login = p.login
 			WHERE `mapIndex` = ?
-			ORDER BY altitude DESC, time ASC;'); 
+			ORDER BY 
+				CASE 
+					WHEN `time` > 0 THEN `time` 
+					ELSE `altitude`
+				END DESC,
+			`date` ASC'); 
 		$stmt->bind_param('i', $mapIndex);
 		if (!$stmt->execute()) {
 			trigger_error('Error executing MySQL query: ' . $stmt->error);
@@ -320,7 +353,8 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 		$labelLine = new LabelLine($headFrame);
 		$labelLine->addLabelEntryText('Rank', $posX + 5);
 		$labelLine->addLabelEntryText('Nickname', $posX + 18);
-		$labelLine->addLabelEntryText('Altitude', $posX + $width * 0.6);
+		$labelLine->addLabelEntryText('Altitude', $posX + $width * 0.5);
+		$labelLine->addLabelEntryText('Time', $posX + $width * 0.6);
 		$labelLine->addLabelEntryText('Date (UTC)', $posX + $width * 0.75);
 		$labelLine->render();
 
@@ -352,8 +386,11 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 			$labelLine = new LabelLine($recordFrame);
 			$labelLine->addLabelEntryText($index + 1, $posX + 5, 13);
 			$labelLine->addLabelEntryText($record["nickname"], $posX + 18, 52);
-			$labelLine->addLabelEntryText($record["altitude"], $posX + $width * 0.6, 31);
-			$labelLine->addLabelEntryText($record["time"], $posX + $width * 0.75, 30);
+			$labelLine->addLabelEntryText($record["altitude"], $posX + $width * 0.5, 31);
+			if ($record["time"] > 0) {
+				$labelLine->addLabelEntryText(Formatter::formatTime($record["time"]), $posX + $width * 0.6, 30);
+			}
+			$labelLine->addLabelEntryText($record["date"], $posX + $width * 0.75, 30);
 			$labelLine->render();
 
 			$recordFrame->setY($posY);
