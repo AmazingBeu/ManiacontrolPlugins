@@ -17,7 +17,6 @@ use ManiaControl\Manialinks\ManialinkManager;
 use ManiaControl\Players\Player;
 use ManiaControl\Callbacks\TimerListener;
 
-
 use ManiaControl\Manialinks\ManialinkPageAnswerListener;
 use ManiaControl\Maps\Map;
 use ManiaControl\Utils\Formatter;
@@ -43,6 +42,7 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 
 	// Callbacks
 	const CB_UPDATEPBS					= 'Trackmania.ClimbTheMap.UpdatePBs';
+	const CB_REQUESTPB					= 'Trackmania.ClimbTheMap.RequestPB';
 
 	// Methods
 	const M_SETPLAYERSPB				= 'Trackmania.ClimbTheMap.SetPlayersPB';
@@ -115,6 +115,7 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_ONFINISHLINE, $this, 'handleFinishCallback');
 
 		$this->maniaControl->getCallbackManager()->registerScriptCallbackListener(self::CB_UPDATEPBS, $this, 'handleUpdatePBs');
+		$this->maniaControl->getCallbackManager()->registerScriptCallbackListener(self::CB_REQUESTPB, $this, 'handleRequestPB');
 
 		$this->maniaControl->getManialinkManager()->registerManialinkPageAnswerListener(self::A_SHOW_ALTITUDE_RECORDS, $this, 'handleShowAltitudeRecords');
 		$this->maniaControl->getCommandManager()->registerCommandListener('records', $this, 'handleShowAltitudeRecords', false);
@@ -143,16 +144,6 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 
 	public function handleAfterInit() {
 		$this->handleStartRound();
-	}
-	
-	/**
-	 * Handle when a player connects
-	 * 
-	 * @param Player $player
-	 */
-	public function handlePlayerConnect(Player $player) {
-		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-
 	}
 
 	public function handleStartRound() {
@@ -221,6 +212,24 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 
 			// Reset manialink cache
 			$this->manialink = "";
+		}
+	}
+
+	/**
+	 * Handle when a player connects
+	 * Can't use the C++ Callback because the it's received by Maniacontrol before that the Maniascript initialized the Player
+	 * 
+	 * @param Player $player
+	 */
+	public function handleRequestPB(array $data) {
+		$login = $data[1][0];
+		$map = $this->maniaControl->getMapManager()->getCurrentMap();
+		if ($map === null) return;
+
+		// Send PB
+		$pbs = $this->getPlayersPB($map->index, [$login]);
+		if (count($pbs) > 0) {
+			$this->maniaControl->getClient()->triggerModeScriptEvent(self::M_SETPLAYERSPB, [json_encode($pbs)]);
 		}
 	}
 
