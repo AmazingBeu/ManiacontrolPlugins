@@ -32,7 +32,7 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 	* Constants
 	*/
 	const PLUGIN_ID			= 192;
-	const PLUGIN_VERSION	= 1.0;
+	const PLUGIN_VERSION	= 1.1;
 	const PLUGIN_NAME		= 'ClimbTheMap';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -99,7 +99,7 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 	 * @see \ManiaControl\Plugins\Plugin::getDescription()
 	 */
 	public static function getDescription() {
-		return "[TM2020 only] Used to save the altitude record";
+		return "[TM2020 only] Used to save the altitude records for the ClimbTheMap game mode";
 	}
 
 	/**
@@ -244,6 +244,9 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 			$this->wraltitude = $wr[1];
 			$this->wrtime = $wr[2];
 			$this->maniaControl->getClient()->triggerModeScriptEvent(self::M_SETWR, [$wr[0], strval($wr[1]), strval($wr[2])]);
+
+			// Reset manialink cache
+			$this->manialink = "";
 		}
 	}
 
