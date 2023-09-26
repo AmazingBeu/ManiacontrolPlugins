@@ -32,7 +32,7 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 	* Constants
 	*/
 	const PLUGIN_ID			= 192;
-	const PLUGIN_VERSION	= 1.1;
+	const PLUGIN_VERSION	= 1.2;
 	const PLUGIN_NAME		= 'ClimbTheMap';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -309,16 +309,16 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 
 		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
 
-		$stmt = $mysqli->prepare('SELECT ctm.index,ctm.login,p.nickname,ctm.altitude,ctm.time,ctm.date FROM `' . self::DB_CLIMBTHEMAP . '` ctm
-			LEFT JOIN `' . PlayerManager::TABLE_PLAYERS . '` p
-			ON ctm.login = p.login
-			WHERE `mapIndex` = ?
-			ORDER BY 
-				CASE 
-					WHEN `time` > 0 THEN `time` 
-					ELSE `altitude`
-				END DESC,
-			`date` ASC'); 
+		$query = 'SELECT ctm.index,ctm.login,p.nickname,ctm.altitude,ctm.time,ctm.date FROM `' . self::DB_CLIMBTHEMAP . '` ctm
+		LEFT JOIN `' . PlayerManager::TABLE_PLAYERS . '` p
+		ON ctm.login = p.login
+		WHERE `mapIndex` = ?
+		ORDER BY (CASE WHEN `time` > 0 THEN `time` ELSE 9999999999 END) ASC,
+		`altitude` DESC,
+		`date` ASC';
+		var_dump($query);
+
+		$stmt = $mysqli->prepare($query ); 
 		$stmt->bind_param('i', $mapIndex);
 		if (!$stmt->execute()) {
 			trigger_error('Error executing MySQL query: ' . $stmt->error);
