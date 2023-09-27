@@ -37,7 +37,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 4.3;
+	const PLUGIN_VERSION									= 4.4;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -74,6 +74,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 	// Gamemodes Settings
 	const SETTING_MATCH_S_CHATTIME							= 'S_ChatTime';
+	const SETTING_MATCH_S_CRASHDETECTIONTHRESHOLD			= 'S_CrashDetectionThreshold';
 	const SETTING_MATCH_S_CUMULATEPOINTS					= 'S_CumulatePoints';
 	const SETTING_MATCH_S_DISABLEGIVEUP						= 'S_DisableGiveUp';
 	const SETTING_MATCH_S_EARLYENDMATCHCALLBACK				= 'S_EarlyEndMatchCallback';
@@ -113,6 +114,11 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'type' => 'integer',
 			'default' => 10,
 			'description' => 'Time before loading the next map' ],
+		self::SETTING_MATCH_S_CRASHDETECTIONTHRESHOLD => [
+			'gamemode' => ['TMWC2023'],
+			'type' => 'integer',
+			'default' => 2000,
+			'description' => 'Time delta in ms with the first player that will be considered as a crash' ],
 		self::SETTING_MATCH_S_CUMULATEPOINTS => [
 			'gamemode' => ['Teams'],
 			'type' => 'boolean',
@@ -124,7 +130,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => false,
 			'description' => 'Disable GiveUp' ],
 		self::SETTING_MATCH_S_EARLYENDMATCHCALLBACK => [
-			'gamemode' => ['Knockout', 'TMWTTeams'],
+			'gamemode' => ['Knockout', 'TMWC2023', 'TMWTTeams'],
 			'type' => 'boolean',
 			'default' => true,
 			'description' => 'Send End Match Callback early (expert user only)' ],
@@ -134,12 +140,12 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => '4',
 			'description' => 'Rank at which one more player is eliminated per round (use coma to add more values. Ex COTD: 8,16,16)' ],
 		self::SETTING_MATCH_S_ENABLEDOSSARDCOLOR => [
-			'gamemode' => ['TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWTTeams'],
 			'type' => 'boolean',
 			'default' => true,
 			'description' => 'Apply color team on the dossard' ],
 		self::SETTING_MATCH_S_FINISHTIMEOUT => [
-			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TMWTTeams', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TMWC2023', 'TMWTTeams', 'Rounds'],
 			'type' => 'integer',
 			'default' => 10,
 			'description' => 'Time after the first finished (-1 = based on Author time)' ],
@@ -149,7 +155,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => -1,
 			'description' => 'Force number of laps for laps maps (-1 = author, 0 for unlimited in TA)' ],
 		self::SETTING_MATCH_S_FORCEROADSPECTATORSNB => [
-			'gamemode' => ['TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWTTeams'],
 			'type' => 'integer',
 			'default' => -1,
 			'description' => 'Force the number of spectators displayed on the border of the road' ],
@@ -159,7 +165,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => false,
 			'description' => 'Never end a race in laps (override S_ForceLapsNb)' ],
 		self::SETTING_MATCH_S_MAPPOINTSLIMIT => [
-			'gamemode' => ['TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWTTeams'],
 			'type' => 'integer',
 			'default' => 10,
 			'description' => 'Track points limit' ],
@@ -169,12 +175,12 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => 3,
 			'description' => 'Number of maps maximum in the match' ],
 		self::SETTING_MATCH_S_MATCHINFO => [
-			'gamemode' => ['TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWTTeams'],
 			'type' => 'string',
 			'default' => "",
 			'description' => 'Match info displayed in the UI' ],
 		self::SETTING_MATCH_S_MATCHPOINTSLIMIT => [
-			'gamemode' => ['TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWTTeams'],
 			'type' => 'integer',
 			'default' => 4,
 			'description' => 'Match points limit' ],
@@ -204,7 +210,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => 100,
 			'description' => 'Limit number of points (0 = unlimited for Ch & R)' ],
 		self::SETTING_MATCH_S_POINTSREPARTITION => [
-			'gamemode' => ['Cup', 'Knockout', 'Teams', 'TMWTTeams', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Teams', 'TMWC2023', 'TMWTTeams', 'Rounds'],
 			'type' => 'string',
 			'default' => '10,6,4,3,2,1',
 			'description' => 'Point repartition from first to last' ],
@@ -224,12 +230,12 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => 1,
 			'description' => 'Rounds without elimination (like a Warmup, but just for the first map)' ],
 		self::SETTING_MATCH_S_SPONSORSURL => [
-			'gamemode' => ['TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWTTeams'],
 			'type' => 'string',
 			'default' => "",
 			'description' => 'URLs separated by a space' ],
 		self::SETTING_MATCH_S_TEAMSURL => [
-			'gamemode' => ['TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWTTeams'],
 			'type' => 'string',
 			'default' => "",
 			'description' => 'URL where to get the teams info' ],
@@ -254,17 +260,17 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => false,
 			'description' => 'Use Tie Break (Only available when S_MapsPerMatch > 1)' ],
 		self::SETTING_MATCH_S_WARMUPDURATION => [
-			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWTTeams', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWC2023', 'TMWTTeams', 'Rounds'],
 			'type' => 'integer',
 			'default' => -1,
 			'description' => 'Duration of 1 Warm Up in sec (-1 = one round, 0 = based on Author time)' ],
 		self::SETTING_MATCH_S_WARMUPNB => [
-			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWTTeams', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWC2023', 'TMWTTeams', 'Rounds'],
 			'type' => 'integer',
 			'default' => 1,
 			'description' => 'Number of Warm Up' ],
 		self::SETTING_MATCH_S_WARMUPTIMEOUT => [
-			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWTTeams', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWC2023', 'TMWTTeams', 'Rounds'],
 			'type' => 'integer',
 			'default' => -1,
 			'description' => 'Time after the first finished the WarmUP (-1 = based on Author time, only when S_WarmUpDuration = -1)' ]
@@ -399,7 +405,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSY, 43, "Position of the Pause Countdown (on Y axis)", 15);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SETTINGS_MODE, array('All from the plugin', 'Maps from file & Settings from plugin', 'All from file'), "Loading mode for maps and match settings, depending on your needs", 20);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_POST_MATCH_MAPLIST, "", "Load Mapfile after the match (empty to just load TA on the same maps) (can be unstable)", 20);
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Cup", "Knockout", "Laps", "Teams", "TimeAttack", "TMWTTeams", "Rounds", "RoyalTimeAttack"), "Gamemode to launch for the match", 25);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Cup", "Knockout", "Laps", "Teams", "TimeAttack", "TMWC2023", "TMWTTeams", "Rounds", "RoyalTimeAttack"), "Gamemode to launch for the match", 25);
 
 		// Init dynamics settings
 		$this->updateSettings();
