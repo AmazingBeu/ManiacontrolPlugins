@@ -313,7 +313,6 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 		ORDER BY (CASE WHEN `time` > 0 THEN `time` ELSE 9999999999 END) ASC,
 		`altitude` DESC,
 		`date` ASC';
-		var_dump($query);
 
 		$stmt = $mysqli->prepare($query ); 
 		$stmt->bind_param('i', $mapIndex);
