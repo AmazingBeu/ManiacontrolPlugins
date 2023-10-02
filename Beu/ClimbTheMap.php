@@ -32,7 +32,7 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 	* Constants
 	*/
 	const PLUGIN_ID			= 192;
-	const PLUGIN_VERSION	= 1.3;
+	const PLUGIN_VERSION	= 1.4;
 	const PLUGIN_NAME		= 'ClimbTheMap';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -312,7 +312,8 @@ class ClimbTheMap implements ManialinkPageAnswerListener, TimerListener, Command
 		WHERE `mapIndex` = ?
 		ORDER BY (CASE WHEN `time` > 0 THEN `time` ELSE 9999999999 END) ASC,
 		`altitude` DESC,
-		`date` ASC';
+		`date` ASC
+		LIMIT 500';
 
 		$stmt = $mysqli->prepare($query ); 
 		$stmt->bind_param('i', $mapIndex);
