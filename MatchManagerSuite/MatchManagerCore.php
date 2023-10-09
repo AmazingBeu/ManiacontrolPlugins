@@ -77,6 +77,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	const SETTING_MATCH_S_CRASHDETECTIONTHRESHOLD			= 'S_CrashDetectionThreshold';
 	const SETTING_MATCH_S_CUMULATEPOINTS					= 'S_CumulatePoints';
 	const SETTING_MATCH_S_DISABLEGIVEUP						= 'S_DisableGiveUp';
+	const SETTING_MATCH_S_DISABLEGOTOMAP					= 'S_DisableGoToMap';
 	const SETTING_MATCH_S_EARLYENDMATCHCALLBACK				= 'S_EarlyEndMatchCallback';
 	const SETTING_MATCH_S_ELIMINATEDPLAYERSNBRANKS			= 'S_EliminatedPlayersNbRanks';
 	const SETTING_MATCH_S_ENABLEDOSSARDCOLOR				= 'S_EnableDossardColor';
@@ -84,6 +85,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	const SETTING_MATCH_S_FORCELAPSNB						= 'S_ForceLapsNb';
 	const SETTING_MATCH_S_FORCEROADSPECTATORSNB				= 'S_ForceRoadSpectatorsNb';
 	const SETTING_MATCH_S_INFINITELAPS						= 'S_InfiniteLaps';
+	const SETTING_MATCH_S_LOADINGSCREENIMAGEURL				= 'S_LoadingScreenImageUrl';
 	const SETTING_MATCH_S_MAPPOINTSLIMIT					= 'S_MapPointsLimit';
 	const SETTING_MATCH_S_MAPSPERMATCH						= 'S_MapsPerMatch';
 	const SETTING_MATCH_S_MATCHPOSITION						= 'S_MatchPosition';
@@ -129,6 +131,11 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'type' => 'boolean',
 			'default' => false,
 			'description' => 'Disable GiveUp' ],
+		self::SETTING_MATCH_S_DISABLEGOTOMAP => [
+			'gamemode' => ['Global'],
+			'type' => 'boolean',
+			'default' => false,
+			'description' => 'Disable the "Go To Map" in the Pause Menu' ],
 		self::SETTING_MATCH_S_EARLYENDMATCHCALLBACK => [
 			'gamemode' => ['Knockout', 'TMWC2023', 'TMWTTeams'],
 			'type' => 'boolean',
@@ -164,6 +171,11 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'type' => 'boolean',
 			'default' => false,
 			'description' => 'Never end a race in laps (override S_ForceLapsNb)' ],
+		self::SETTING_MATCH_S_LOADINGSCREENIMAGEURL => [
+			'gamemode' => ['Global'],
+			'type' => 'string',
+			'default' => "",
+			'description' => 'Image URL of the Loading Screen during the map change' ],
 		self::SETTING_MATCH_S_MAPPOINTSLIMIT => [
 			'gamemode' => ['TMWC2023', 'TMWTTeams'],
 			'type' => 'integer',
@@ -325,6 +337,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	private $settings_nbwinners		= 2;
 	private $settings_nbmapsbymatch	= 0;
 	private $settings_pointlimit	= 100;
+	private $settings_disablegotomap= false;
 
 	private $currentscore			= array();
 	/** @var OnScoresStructure|null $preendroundscore */
@@ -861,6 +874,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		}
 		if (isset($this->currentgmsettings[self::SETTING_MATCH_S_MAPSPERMATCH])) {	
 			$this->settings_nbmapsbymatch	= (int) $this->currentgmsettings[self::SETTING_MATCH_S_MAPSPERMATCH];
+		}
+		if (isset($this->currentgmsettings[self::SETTING_MATCH_S_DISABLEGOTOMAP])) {	
+			$this->settings_disablegotomap	= (bool) $this->currentgmsettings[self::SETTING_MATCH_S_DISABLEGOTOMAP];
 		}
 	}
 
@@ -1410,7 +1426,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				$message .= Formatter::stripCodes($this->currentmap->name);
 				$this->maniaControl->getChat()->sendInformation($message);
 
-				if (!in_array($this->currentgmbase, ["Laps", "TimeAttack", "RoyalTimeAttack"])) {
+				if (!in_array($this->currentgmbase, ["Laps", "TimeAttack", "RoyalTimeAttack"]) && !$this->settings_disablegotomap) {
 					$message = "";
 					$i = 0;
 					foreach ($maps as $map) {
