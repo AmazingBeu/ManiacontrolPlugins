@@ -35,7 +35,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 1.5;
+	const PLUGIN_VERSION									= 1.6;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -95,6 +95,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	private $maniaControl 			= null;
 	private $MatchManagerCore		= null;
 	private $matchstatus			= "";
+	private $chatprefix				= '$<$fc3$w🏆$m$> '; // Would like to create a setting but MC database doesn't support utf8mb4
 	private $device_code			= "";
 	private $access_token			= "";
 	private $matchid				= "";
@@ -509,13 +510,16 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				$data->data[3] = new \stdClass;
 				$data->data[3]->range = "'" . $sheetname . "'!" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["TeamsScoreTable_BeginLetter"] . "2";
 				$data->data[3]->values = $currentteamsscore;
+			} else {
+				$nbmaps = $this->MatchManagerCore->getMapNumber();
+				$nbrounds = $this->MatchManagerCore->getRoundNumber();
 			}
 
 			$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values:batchUpdate');
 			$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
 			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 			$asyncHttpRequest->setContent(json_encode($data));
-			$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname, $currentscore, $currentteamsscore, $matchstatus) {
+			$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname, $currentscore, $currentteamsscore, $matchstatus, $nbmaps, $nbrounds) {
 				if (!$json || $error) {
 					Logger::logError('Error from Google API: ' . $error);
 					$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
@@ -531,7 +535,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				if ($this->currentdatamode == "All Rounds Data" && $matchstatus == "running") {
 					$newcurrentscore = [];
 					foreach ($currentscore as $score) {
-						array_push($newcurrentscore,array_merge([$this->MatchManagerCore->getMapNumber() , $this->MatchManagerCore->getRoundNumber()], $score));
+						array_push($newcurrentscore,array_merge([$nbmaps, $nbrounds], $score));
 					}
 
 					$data = new \stdClass;
@@ -543,7 +547,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
 					$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 					$asyncHttpRequest->setContent(json_encode($data));
-					$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname, $currentscore, $currentteamsscore) {
+					$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname, $currentteamsscore, $nbmaps, $nbrounds) {
 						if (!$json || $error) {
 							Logger::logError('Error from Google API: ' . $error);
 							$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
@@ -559,7 +563,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 						if (!empty($currentteamsscore)) {
 							$newcurrentteamsscore = [];
 							foreach ($currentteamsscore as $score) {
-								array_push($newcurrentteamsscore,array_merge([$this->MatchManagerCore->getMapNumber() , $this->MatchManagerCore->getRoundNumber()], $score));
+								array_push($newcurrentteamsscore,array_merge([$nbmaps, $nbrounds], $score));
 							}
 
 							$data = new \stdClass;
