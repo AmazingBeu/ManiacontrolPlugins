@@ -11,6 +11,7 @@ use ManiaControl\Callbacks\CallbackListener;
 use ManiaControl\Callbacks\Callbacks;
 use ManiaControl\Callbacks\CallbackManager;
 use ManiaControl\Callbacks\Structures\Common\StatusCallbackStructure;
+use ManiaControl\Callbacks\Structures\ManiaPlanet\StartEndStructure;
 use ManiaControl\Callbacks\Structures\TrackMania\OnPointsRepartitionStructure;
 use ManiaControl\Callbacks\Structures\TrackMania\OnScoresStructure;
 use ManiaControl\Commands\CommandListener;
@@ -37,7 +38,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 4.5;
+	const PLUGIN_VERSION									= 4.6;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -1506,8 +1507,17 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	/**
 	 * Handle callback "BeginRound"
 	 */
-	public function handleBeginRoundCallback() {
+	public function handleBeginRoundCallback(StartEndStructure $structure) {
 		Logger::log("handleBeginRoundCallback");
+
+		if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL")) {
+			$this->nbrounds = $structure->getValidRoundCount();
+		} else if (property_exists($structure->getPlainJsonObject(), "valid")) {
+			$this->nbrounds = $structure->getPlainJsonObject()->valid;
+		} else {
+			$this->nbrounds = $structure->getCount();
+		}
+		
 
 		if ($this->matchStarted && $this->nbmaps > 0) {
 			if (in_array($this->currentgmbase, ["Cup", "Teams", "Rounds"])) {
@@ -1517,8 +1527,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						Logger::log("Pause");
 					} else {
 						if ($this->settings_nbroundsbymap > 1) {
-							$this->maniaControl->getChat()->sendInformation($this->chatprefix . '$o$iRound: ' . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
-							Logger::log("Round: " . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
+							$this->maniaControl->getChat()->sendInformation($this->chatprefix . '$o$iRound: ' . $this->nbrounds . ' / ' . $this->settings_nbroundsbymap);
+							Logger::log("Round: " . $this->nbrounds . ' / ' . $this->settings_nbroundsbymap);
 						}
 					}
 				});
@@ -1551,7 +1561,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			} elseif ($structure->getSection() == "EndRound") {
 				$timestamp = time();
 
-				if ($this->nbmaps != 0 and ($this->nbrounds != $this->settings_nbroundsbymap || $this->nbrounds == 0 )) {
+				if ($this->nbmaps != 0 && $this->nbrounds <= $this->settings_nbroundsbymap) {
 					//
 					// Players Scores
 					//
@@ -1644,31 +1654,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 							));
 							$rank++;
 						}
-					}
-
-					//
-					// End Round Routines
-					//
-					if (!$this->pauseon && !$this->skipround) {
-						if ($this->currentgmbase != "Cup") {
-							$this->nbrounds++;
-						} else if ($this->currentgmbase == "Cup" && count($this->currentscore) > 0) { // Round is skipped if no one finishes only in cup mode
-							foreach ($this->currentscore as $score) {
-								if ($score[4] > 0) {
-									$this->nbrounds++;
-									break;
-								}
-							}
-						} else {
-							Logger::log("Round not counted because no one finished");
-						}
-					}
-					if ($this->skipround) {
-						$this->skipround = false;
-					}
-
-					if ($this->currentgmbase == "Knockout" && $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_S_ROUNDSWITHOUTELIMINATION) <= $this->nbrounds && $this->nbmaps == 1) {
-						Logger::log("Round without elimination");
 					}
 
 					//
