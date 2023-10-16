@@ -440,8 +440,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERDISCONNECT, $this, 'handlePlayerDisconnect');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_SCORES, $this, 'handleEndRoundCallback');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_SCORES, $this, 'handleTrackmaniaScore');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_STARTROUNDSTART, $this, 'handleBeginRoundCallback');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_ENDROUNDEND, $this, 'handleEndRoundCallback');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_WARMUPSTARTROUND, $this, 'handleStartWarmUpCallback');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_STARTMATCHSTART, $this, 'handleStartMatchStartCallback');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(CallbackManager::CB_MP_BEGINMAP, $this, 'handleBeginMapCallback');
@@ -453,6 +454,21 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.MatchStart", $this, function () { return new CommunicationAnswer($this->MatchStart()); });
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.MatchStop", $this, function () { return new CommunicationAnswer($this->MatchStop()); });
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.GetMatchOptions", $this, function () { return new CommunicationAnswer($this->getGMSettings($this->currentgmbase,$this->currentcustomgm)); });
+	}
+
+	public function handleEndRoundCallback(StartEndStructure $structure) {
+		Logger::log("handleEndRoundCallback");
+
+		if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL") && method_exists($structure, "getValidRoundCount")) {
+			$this->nbrounds = $structure->getValidRoundCount();
+		} else if (property_exists($structure->getPlainJsonObject(), "valid")) {
+			$this->nbrounds = $structure->getPlainJsonObject()->valid;
+		} else {
+			$this->nbrounds = $structure->getCount();
+		}
+
+		Logger::log("Rounds finished: " . $this->nbrounds);
+		$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_ENDROUND, $this->matchid, $this->currentscore, $this->currentteamsscore);
 	}
 
 	/**
@@ -1507,17 +1523,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	/**
 	 * Handle callback "BeginRound"
 	 */
-	public function handleBeginRoundCallback(StartEndStructure $structure) {
+	public function handleBeginRoundCallback() {
 		Logger::log("handleBeginRoundCallback");
-
-		if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL")) {
-			$this->nbrounds = $structure->getValidRoundCount();
-		} else if (property_exists($structure->getPlainJsonObject(), "valid")) {
-			$this->nbrounds = $structure->getPlainJsonObject()->valid;
-		} else {
-			$this->nbrounds = $structure->getCount();
-		}
-		
 
 		if ($this->matchStarted && $this->nbmaps > 0) {
 			if (in_array($this->currentgmbase, ["Cup", "Teams", "Rounds"])) {
@@ -1527,8 +1534,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						Logger::log("Pause");
 					} else {
 						if ($this->settings_nbroundsbymap > 1) {
-							$this->maniaControl->getChat()->sendInformation($this->chatprefix . '$o$iRound: ' . $this->nbrounds . ' / ' . $this->settings_nbroundsbymap);
-							Logger::log("Round: " . $this->nbrounds . ' / ' . $this->settings_nbroundsbymap);
+							$this->maniaControl->getChat()->sendInformation($this->chatprefix . '$o$iRound: ' . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
+							Logger::log("Round: " . ($this->nbrounds + 1) . ' / ' . $this->settings_nbroundsbymap);
 						}
 					}
 				});
@@ -1547,8 +1554,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * 
 	 * @param OnScoresStructure $structure
 	 */
-	public function handleEndRoundCallback(OnScoresStructure $structure) {
-		Logger::log("handleEndRoundCallback-" . $structure->getSection());
+	public function handleTrackmaniaScore(OnScoresStructure $structure) {
+		Logger::log("handleTrackmaniaScore-" . $structure->getSection());
 
 		if ($this->matchStarted && $this->settingsloaded && !$this->postmatch) {
 			Logger::log("Section: " . $structure->getSection());
@@ -1697,9 +1704,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 							trigger_error($mysqli->error);
 						}
 					}
-
-					Logger::log("Rounds finished: " . $this->nbrounds);
-					$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_ENDROUND, $this->matchid, $this->currentscore, $this->currentteamsscore);
 				}
 			}
 			return true;
