@@ -6,6 +6,7 @@
 !MatchManagerSuite/*
 !Beu
 !Beu/AFKNotifier.php
+!Beu/BeuCustomConfig.php
 !Beu/BeuDonationButton.php
 !Beu/ChatAdminColorer.php
 !Beu/ClimbTheMap.php
@@ -15,3 +16,4 @@
 !Beu/ReloadDevTool.php
 !Beu/SimpleChatColorer.php
 !Beu/SimpleSkinsRemover.php
+!Beu/SmallTextOverlay.php
