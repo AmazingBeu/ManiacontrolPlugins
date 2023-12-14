@@ -8,6 +8,7 @@
 !Beu/AFKNotifier.php
 !Beu/BeuCustomConfig.php
 !Beu/BeuDonationButton.php
+!Beu/BlacklistManager.php
 !Beu/ChatAdminColorer.php
 !Beu/ClimbTheMap.php
 !Beu/GameModeLoader.php
