@@ -127,7 +127,7 @@ class BlacklistManager implements CommandListener, Plugin {
 			if (!isset($login)) {
 				$this->maniaControl->getChat()->sendError( "Login not found. FYI The player must be connected" , $player);
 			} else {
-				if ($this->addLoginToGL($login)) {
+				if ($this->addLoginToBL($login)) {
 					$this->maniaControl->getChat()->sendSuccess( "Player " . $peopletoadd . " added to the Blacklist" , $player);
 				} else {
 					$this->maniaControl->getChat()->sendSuccess( "Player " . $peopletoadd . " already in the Blacklist" , $player);
@@ -142,14 +142,14 @@ class BlacklistManager implements CommandListener, Plugin {
 	 * @param string $login
 	 * @param array $blacklist
 	*/
-	public function addLoginToGL(String $login, array $blacklist = []) {
+	public function addLoginToBL(String $login, array $blacklist = []) {
 		if (empty($blacklist)) {
 			$blacklist = $this->maniaControl->getClient()->getBlackList();
 		}
 		$logintoadd = "";
 		$logintoadd = array_search($login ,array_column($blacklist, 'login'));
 		if (strlen($logintoadd) == 0) {
-			$this->maniaControl->getClient()->addGuest($login);
+			$this->maniaControl->getClient()->blackList($login);
 			return true;
 		} else {
 			return false;
