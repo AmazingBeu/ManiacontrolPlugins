@@ -38,7 +38,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 4.6;
+	const PLUGIN_VERSION									= 4.7;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -1561,7 +1561,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			} elseif ($structure->getSection() == "EndRound") {
 				$timestamp = time();
 
-				if ($this->nbmaps != 0 && $this->nbrounds <= $this->settings_nbroundsbymap) {
+				if ($this->nbmaps != 0 && ($this->nbrounds <= $this->settings_nbroundsbymap || $this->settings_nbroundsbymap <= 0)) {
 					//
 					// Players Scores
 					//
