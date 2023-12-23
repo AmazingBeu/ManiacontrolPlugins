@@ -510,10 +510,10 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				$data->data[3] = new \stdClass;
 				$data->data[3]->range = "'" . $sheetname . "'!" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["TeamsScoreTable_BeginLetter"] . "2";
 				$data->data[3]->values = $currentteamsscore;
-			} else {
-				$nbmaps = $this->MatchManagerCore->getMapNumber();
-				$nbrounds = $this->MatchManagerCore->getRoundNumber();
 			}
+
+			$nbmaps = $this->MatchManagerCore->getMapNumber();
+			$nbrounds = $this->MatchManagerCore->getRoundNumber();
 
 			$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET) . '/values:batchUpdate');
 			$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
