@@ -38,7 +38,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 4.7;
+	const PLUGIN_VERSION									= 4.8;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -571,6 +571,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 	public function getMatchStatus() {
 		return $this->matchStarted;
+	}
+
+	public function getMatchIsRunning() {
+		return ($this->matchStarted && $this->settingsloaded && !$this->postmatch);
 	}
 
 	public function getCurrentGamemodeBase() {
