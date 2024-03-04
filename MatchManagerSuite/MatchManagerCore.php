@@ -38,7 +38,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 4.8;
+	const PLUGIN_VERSION									= 4.9;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -70,6 +70,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 	const SETTING_MODE_MAPS									= 'Maps to play';
 	const SETTING_MODE_SHUFFLE								= 'Randomize map order (shuffle)';
+	const SETTING_MODE_SHUFFLE_SEED							= 'Randomize map seed';
 	const SETTING_MODE_HIDENEXTMAPS							= 'Mask the next maps during the match';
 	const SETTING_MODE_MAPLIST_FILE							= 'Maplist to use';
 
@@ -300,6 +301,11 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'type' => 'boolean',
 			'default' => false,
 			'description' => 'Shuffle maps order' ],
+		self::SETTING_MODE_SHUFFLE_SEED => [ 
+			'mode' => ['All from the plugin'],
+			'type' => 'string',
+			'default' => '',
+			'description' => 'Seed to shuffle maps to have the same maps between multiple matches (empty for random)' ],
 		self::SETTING_MODE_HIDENEXTMAPS => [ 
 			'mode' => ['All from the plugin'],
 			'type' => 'boolean',
@@ -936,6 +942,11 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 				if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MODE_SHUFFLE)) {
 					$this->mapsshuffled = true;
+
+					$seed = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MODE_SHUFFLE_SEED);
+					if ($seed !== "") {
+						mt_srand(crc32(123));
+					}
 					shuffle($maps);
 				}
 
