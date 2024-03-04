@@ -14,6 +14,7 @@ use ManiaControl\Files\AsyncHttpRequest;
 use ManiaControl\Commands\CommandListener;
 use ManiaControl\Admin\AuthenticationManager;
 use ManiaControl\Callbacks\TimerListener;
+use ManiaControl\Players\PlayerManager;
 use ManiaControl\Utils\WebReader;
 
 if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
@@ -35,7 +36,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 1.6;
+	const PLUGIN_VERSION									= 2.0;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -53,36 +54,36 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 
 	const MODE_SPECIFICS_SETTINGS = [
 		"Last Round Only" => [
-			"ScoreTable_endColumnIndex" => 15,
-			"TeamsScoreTable_startColumnIndex" => 16,
-			"TeamsScoreTable_endColumnIndex" => 22,
+			"ScoreTable_endColumnIndex" => 16,
+			"TeamsScoreTable_startColumnIndex" => 17,
+			"TeamsScoreTable_endColumnIndex" => 23,
 			"ScoreTable_BeginLetter" => "D",
-			"ScoreTable_EndLetter" => "O",
-			"TeamsScoreTable_BeginLetter" => "Q",
-			"TeamsScoreTable_EndLetter" => "V",
-			"ScoreTable_Labels" => ["Rank","Login", "MatchPoints", "MapPoints", "RoundPoints","BestRaceTime","BestRaceCheckpoints","BestLaptime","BestLapCheckpoints","PrevRaceTime","PrevRaceCheckpoints","Team"],
+			"ScoreTable_EndLetter" => "P",
+			"TeamsScoreTable_BeginLetter" => "R",
+			"TeamsScoreTable_EndLetter" => "W",
+			"ScoreTable_Labels" => ["Rank","Login", "Name", "MatchPoints", "MapPoints", "RoundPoints","BestRaceTime","BestRaceCheckpoints","BestLaptime","BestLapCheckpoints","PrevRaceTime","PrevRaceCheckpoints","Team"],
 			"TeamsScoreTable_Labels" => ["Rank","Team ID", "Name", "MatchPoints", "MapPoints", "RoundPoints"]
 		],		
 		"All Rounds Data" => [
-			"ScoreTable_endColumnIndex" => 17,
-			"TeamsScoreTable_startColumnIndex" => 18,
-			"TeamsScoreTable_endColumnIndex" => 26,
+			"ScoreTable_endColumnIndex" => 18,
+			"TeamsScoreTable_startColumnIndex" => 19,
+			"TeamsScoreTable_endColumnIndex" => 27,
 			"ScoreTable_BeginLetter" => "D",
-			"ScoreTable_EndLetter" => "Q",
-			"TeamsScoreTable_BeginLetter" => "S",
-			"TeamsScoreTable_EndLetter" => "X",
-			"ScoreTable_Labels" => ["Map", "Round", "Rank","Login", "MatchPoints", "MapPoints", "RoundPoints","BestRaceTime","BestRaceCheckpoints","BestLaptime","BestLapCheckpoints","PrevRaceTime","PrevRaceCheckpoints","Team"],
+			"ScoreTable_EndLetter" => "R",
+			"TeamsScoreTable_BeginLetter" => "T",
+			"TeamsScoreTable_EndLetter" => "Y",
+			"ScoreTable_Labels" => ["Map", "Round", "Rank", "Login", "Name", "MatchPoints", "MapPoints", "RoundPoints","BestRaceTime","BestRaceCheckpoints","BestLaptime","BestLapCheckpoints","PrevRaceTime","PrevRaceCheckpoints","Team"],
 			"TeamsScoreTable_Labels" => ["Map", "Round", "Rank","Team ID", "Name", "MatchPoints", "MapPoints", "RoundPoints"]
 		],
 		"End Match Only" => [
-			"ScoreTable_endColumnIndex" => 15,
-			"TeamsScoreTable_startColumnIndex" => 16,
-			"TeamsScoreTable_endColumnIndex" => 22,
+			"ScoreTable_endColumnIndex" => 16,
+			"TeamsScoreTable_startColumnIndex" => 17,
+			"TeamsScoreTable_endColumnIndex" => 23,
 			"ScoreTable_BeginLetter" => "D",
-			"ScoreTable_EndLetter" => "O",
-			"TeamsScoreTable_BeginLetter" => "Q",
-			"TeamsScoreTable_EndLetter" => "V",
-			"ScoreTable_Labels" => ["Rank","Login", "MatchPoints", "MapPoints", "RoundPoints","BestRaceTime","BestRaceCheckpoints","BestLaptime","BestLapCheckpoints","PrevRaceTime","PrevRaceCheckpoints","Team"],
+			"ScoreTable_EndLetter" => "P",
+			"TeamsScoreTable_BeginLetter" => "R",
+			"TeamsScoreTable_EndLetter" => "W",
+			"ScoreTable_Labels" => ["Rank","Login", "Name", "MatchPoints", "MapPoints", "RoundPoints","BestRaceTime","BestRaceCheckpoints","BestLaptime","BestLapCheckpoints","PrevRaceTime","PrevRaceCheckpoints","Team"],
 			"TeamsScoreTable_Labels" => ["Rank","Team ID", "Name", "MatchPoints", "MapPoints", "RoundPoints"]
 		]
 	];
@@ -160,6 +161,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		}
 
 		// Callbacks
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_UNLOADED, $this, 'handlePluginUnloaded');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STARTMATCH, $this, 'CheckAndPrepareSheet');
@@ -180,6 +182,8 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		$this->access_token = $this->getSecretSetting("access_token");
 
 		$this->maniaControl->getChat()->sendErrorToAdmins('To use the MatchManagerGSheet plugin, $<$l[https://github.com/AmazingBeu/ManiacontrolPlugins/wiki/MatchManager-GSheet]check the doc$>');
+		
+		$this->maniaControl->getChat()->sendErrorToAdmins('Since MatchManagerGSheet 2.0, Player names are in the results and no more in a separated list');
 
 		return true;
 	}
@@ -244,6 +248,12 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				$this->maniaControl->getSettingManager()->saveSetting($setting);
 				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'You can\'t change data mode during a Match');
 			}
+		}
+	}
+
+	public function handlePlayerConnect(Player $player) {
+		if ($this->maniaControl->getAuthenticationManager()->checkRight($player, AuthenticationManager::AUTH_LEVEL_ADMIN)) {
+			$this->maniaControl->getChat()->sendError('Since MatchManagerGSheet 2.0, Player names are in the results and no more in a separated list', $player->login);
 		}
 	}
 
@@ -472,6 +482,14 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	}
 
 	public function UpdateGSheetData(String $matchid, Array $currentscore, Array $currentteamsscore) {
+		foreach ($currentscore as $key => $score) {
+			$name = "~";
+			$player = $this->maniaControl->getPlayerManager()->getPlayer($score[1]);
+			if ($player !== null) $name = $player->nickname;
+			array_splice($score, 2, 0, [$name]);
+			$currentscore[$key] = $score;
+		}
+
 		$matchstatus = $this->matchstatus;
 		if ($this->currentdatamode === "End Match Only" && $this->matchstatus === "running") return;
 
@@ -489,27 +507,14 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				$data->data[0]->values = array(array($matchstatus),array($this->MatchManagerCore->getCountMap()),array($this->MatchManagerCore->getCountRound()),array($this->maniaControl->getPlayerManager()->getPlayerCount()),array($this->maniaControl->getPlayerManager()->getSpectatorCount()));
 			}
 
-			$data->data[1] = new \stdClass;
-			$data->data[1]->range = "'" . $sheetname . "'!A9";
-
-			foreach ($this->maniaControl->getPlayerManager()->getPlayers() as $player) {
-				$this->playerlist[$player->login] = $player->nickname;
-			}
-			$players = [];
-			foreach ($this->playerlist as $login => $nickname) {
-				array_push($players,array($login, $nickname));
-			}
-
-			$data->data[1]->values = $players;
-
 			if ($this->currentdatamode === "Last Round Only" || $this->currentdatamode === "End Match Only") {
-				$data->data[2] = new \stdClass;
-				$data->data[2]->range = "'" . $sheetname . "'!" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["ScoreTable_BeginLetter"] . "2";
-				$data->data[2]->values = $currentscore;
+				$data->data[1] = new \stdClass;
+				$data->data[1]->range = "'" . $sheetname . "'!" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["ScoreTable_BeginLetter"] . "2";
+				$data->data[1]->values = $currentscore;
 
-				$data->data[3] = new \stdClass;
-				$data->data[3]->range = "'" . $sheetname . "'!" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["TeamsScoreTable_BeginLetter"] . "2";
-				$data->data[3]->values = $currentteamsscore;
+				$data->data[2] = new \stdClass;
+				$data->data[2]->range = "'" . $sheetname . "'!" . self::MODE_SPECIFICS_SETTINGS[$this->currentdatamode]["TeamsScoreTable_BeginLetter"] . "2";
+				$data->data[2]->values = $currentteamsscore;
 			}
 
 			$nbmaps = $this->MatchManagerCore->getMapNumber();
@@ -535,7 +540,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				if ($this->currentdatamode == "All Rounds Data" && $matchstatus == "running") {
 					$newcurrentscore = [];
 					foreach ($currentscore as $score) {
-						array_push($newcurrentscore,array_merge([$nbmaps, $nbrounds], $score));
+						array_push($newcurrentscore, array_merge([$nbmaps, $nbrounds], $score));
 					}
 
 					$data = new \stdClass;
@@ -667,11 +672,6 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	private function PrepareSheet(String $sheetname, bool $sheetexists, Array $sheetsid) {
 		if ($this->refreshTokenIfNeeded()) { 
 
-			$this->playerlist = array();
-			foreach ($this->maniaControl->getPlayerManager()->getPlayers() as $player) {
-				$this->playerlist[$player->login] = $player->nickname;
-			}
-
 			$data = new \stdClass;
 			$data->requests = array();
 			$i = 0;
@@ -713,26 +713,6 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			$data->requests[$i]->repeatCell->range->endRowIndex = 6;
 			$data->requests[$i]->repeatCell->range->startColumnIndex = 0;
 			$data->requests[$i]->repeatCell->range->endColumnIndex = 1;
-			$data->requests[$i]->repeatCell->cell = new \stdClass;
-			$data->requests[$i]->repeatCell->cell->userEnteredFormat = new \stdClass;
-			$data->requests[$i]->repeatCell->cell->userEnteredFormat->backgroundColor = new \stdClass;
-			$data->requests[$i]->repeatCell->cell->userEnteredFormat->backgroundColor->red = 0.6;
-			$data->requests[$i]->repeatCell->cell->userEnteredFormat->backgroundColor->green = 0.9;
-			$data->requests[$i]->repeatCell->cell->userEnteredFormat->backgroundColor->blue = 0.6;
-			$data->requests[$i]->repeatCell->cell->userEnteredFormat->textFormat = new \stdClass;
-			$data->requests[$i]->repeatCell->cell->userEnteredFormat->textFormat->bold = true;
-			$data->requests[$i]->repeatCell->fields = "userEnteredFormat(backgroundColor,textFormat)";
-			$i++;
-
-			//Player list
-			$data->requests[$i] = new \stdClass;
-			$data->requests[$i]->repeatCell = new \stdClass;
-			$data->requests[$i]->repeatCell->range = new \stdClass;
-			$data->requests[$i]->repeatCell->range->sheetId = $sheetid;
-			$data->requests[$i]->repeatCell->range->startRowIndex = 7;
-			$data->requests[$i]->repeatCell->range->endRowIndex = 8;
-			$data->requests[$i]->repeatCell->range->startColumnIndex = 0;
-			$data->requests[$i]->repeatCell->range->endColumnIndex = 2;
 			$data->requests[$i]->repeatCell->cell = new \stdClass;
 			$data->requests[$i]->repeatCell->cell->userEnteredFormat = new \stdClass;
 			$data->requests[$i]->repeatCell->cell->userEnteredFormat->backgroundColor = new \stdClass;
@@ -823,7 +803,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 
 					$data->data[0] = new \stdClass;
 					$data->data[0]->range = "'" . $sheetname . "'!A1";
-					$data->data[0]->values = array(array("Informations"),array("Match status:", $this->matchstatus),array("Maps:","0/0"),array("Rounds:","0/0"),array("Players:","0"),array("Spectators:","0"),array(),array("Login:","Nickname:"));
+					$data->data[0]->values = array(array("Informations"),array("Match status:", $this->matchstatus),array("Maps:","0/0"),array("Rounds:","0/0"),array("Players:","0"),array("Spectators:","0"));
 
 					$data->data[1] = new \stdClass;
 					$data->data[1]->range = "'" . $sheetname . "'!D1";
