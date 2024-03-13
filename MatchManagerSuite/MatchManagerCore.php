@@ -38,7 +38,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 4.9;
+	const PLUGIN_VERSION									= 4.10;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -945,7 +945,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 					$seed = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MODE_SHUFFLE_SEED);
 					if ($seed !== "") {
-						mt_srand(crc32(123));
+						mt_srand(crc32($seed));
 					}
 					shuffle($maps);
 				}
