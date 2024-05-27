@@ -38,7 +38,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 5.0;
+	const PLUGIN_VERSION									= 5.1;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -894,15 +894,16 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	/**
 	 * Function called to list matches
 	 */
-	public function getMatchesList($limit = 10) {
+	public function getMatchesList(int $limit = 10) {
 		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-		$query = "SELECT `gamemodebase`,`started`,`ended` FROM `" . self::DB_MATCHESINDEX . "`
-				ORDER BY `started` DESC LIMIT " . $limit;
-		$result = $mysqli->query($query);
-		if ($mysqli->error) {
-			trigger_error($mysqli->error);
-			return false;
+		$stmt = $mysqli->prepare("SELECT `gamemodebase`,`started`,`ended` FROM `" . self::DB_MATCHESINDEX . "` ORDER BY `started` DESC LIMIT ?");
+		$stmt->bind_param('i', $limit);
+
+		if (!$stmt->execute()) {
+			Logger::logError('Error executing MySQL query: '. $stmt->error);
 		}
+
+		$result = $stmt->get_result();
 		while($row = $result->fetch_array()) {
 			$array[] = $row;
 		}
@@ -1021,15 +1022,17 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				$this->handlePlayerConnect($player);
 			}
 
+			$serverlogin = $this->maniaControl->getServer()->login;
+			$timestamp = time();
+
 			// MYSQL DATA INSERT
 			$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-			$query = 'INSERT INTO `' . self::DB_MATCHESINDEX . '`
-				(`matchid`, `server`, `gamemodebase`, `started`, `ended`)
-				VALUES
-				("' . $this->matchid . '","' . $this->maniaControl->getServer()->login . '","' . $this->currentgmbase . '","' . time() . '","0" )';
-			$mysqli->query($query);
-			if ($mysqli->error) {
-				throw new \Exception("Error during the MySQL insert: " . $mysqli->error);
+			$stmt = $mysqli->prepare('INSERT INTO `' . self::DB_MATCHESINDEX . '` (`matchid`, `server`, `gamemodebase`, `started`, `ended`)
+				VALUES (?, ?, ?, ?, 0)');
+			$stmt->bind_param('sssi', $this->matchid, $serverlogin, $this->currentgmbase, $timestamp);
+
+			if (!$stmt->execute()) {
+				Logger::logError('Error executing MySQL query: '. $stmt->error);
 			}
 
 			// Trigger Callback
@@ -1072,12 +1075,15 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				}
 			}
 
+			$timestamp = time();
+
 			// MYSQL DATA INSERT
 			$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-			$query = 'UPDATE `' . self::DB_MATCHESINDEX . '` SET `ended` = "' . time() . '" WHERE `matchid` = "' . $this->matchid . '"';
-			$mysqli->query($query);
-			if ($mysqli->error) {
-				trigger_error($mysqli->error);
+			$stmt = $mysqli->prepare('UPDATE `' . self::DB_MATCHESINDEX . '` SET `ended` = ? WHERE `matchid` = ?');
+			$stmt->bind_param('is', $timestamp, $this->matchid);
+
+			if (!$stmt->execute()) {
+				Logger::logError('Error executing MySQL query: '. $stmt->error);
 			}
 
 			// Trigger Callback
@@ -1141,43 +1147,59 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * Function called to recover a match
 	 * @param integer $index
 	 */
-	public function MatchRecover(Int $index) {
+	public function MatchRecover(int $index): bool {
 		Logger::log("Match Recover");
 
 		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-		$query = "SELECT `matchid`,`gamemodebase` FROM `" . self::DB_MATCHESINDEX . "`
-				ORDER BY `started` DESC LIMIT " . $index . ",1";
-		$result = $mysqli->query($query);
+		$stmt = $mysqli->prepare('SELECT `matchid`,`gamemodebase` FROM `' . self::DB_MATCHESINDEX . '` ORDER BY `started` DESC LIMIT ? , 1');
+		$stmt->bind_param('i', $index);
+
+		if (!$stmt->execute()) {
+			Logger::logError('Error executing MySQL query: '. $stmt->error);
+			return false;
+		}
+		$result = $stmt->get_result();
+		
 		$array = mysqli_fetch_array($result);
+
 		if (isset($array[0])) {
 			$gamemodebase = $array['gamemodebase'];
 			$matchid = $array['matchid'];
-			unset($array);
+
 			$this->matchrecover = true;
-			$query = "SELECT `timestamp`,`settings`,`nbmaps`,`nbrounds` FROM `" . self::DB_ROUNDSINDEX . "`
-					WHERE `matchid` = '" . $matchid . "'
-					ORDER BY `timestamp` DESC LIMIT 1";
-			$result = $mysqli->query($query);
+
+			$stmt = $mysqli->prepare('SELECT `timestamp` FROM `' . self::DB_ROUNDSINDEX . '` WHERE `matchid` = ? ORDER BY `timestamp` DESC LIMIT 1');
+			$stmt->bind_param('s', $matchid);
+
+			if (!$stmt->execute()) {
+				Logger::logError('Error executing MySQL query: '. $stmt->error);
+				return false;
+			}
+			$result = $stmt->get_result();
+
 			$array = mysqli_fetch_array($result);
 			if (isset($array[0])) {
-				$nbmaps=$array['nbmaps'];
-				$nbrounds=$array['nbrounds'];
-				$settings=$array['settings'];
-				$timestamp=$array['timestamp'];
-				unset($array);
+				$timestamp = $array['timestamp'];
 				if ($gamemodebase == "Teams") {
-					$query = "SELECT `id` AS login,`points` AS matchpoints FROM `" . self::DB_TEAMSDATA . "`
-					WHERE `timestamp` = (SELECT `timestamp` FROM `" . self::DB_TEAMSDATA . "`
-					WHERE `matchid` = '" . $matchid . "' ORDER BY `timestamp` DESC LIMIT 1)" ;
+					$stmt = $mysqli->prepare('SELECT `id` AS login, `matchpoints` FROM `' . self::DB_TEAMSDATA . '`
+						WHERE `matchid` = ? AND `timestamp` = ?');
+					/*$stmt = $mysqli->prepare('SELECT `id` AS login, `points` AS matchpoints FROM `' . self::DB_TEAMSDATA . '`
+						WHERE `timestamp` = (SELECT `timestamp` FROM `' . self::DB_TEAMSDATA . '`
+						WHERE `matchid` = ? ORDER BY `timestamp` DESC LIMIT 1)');
+						*/
 				} else {
-					$query = "SELECT `login`,`matchpoints` FROM `" . self::DB_ROUNDSDATA . "`
-					WHERE `timestamp` = '" . $timestamp . "'";
+					$stmt = $mysqli->prepare('SELECT `login`,`matchpoints` FROM `' . self::DB_ROUNDSDATA . '`
+						WHERE `matchid` = ? AND `timestamp` = ?');
 				}
-				$result = $mysqli->query($query);
-				if ($mysqli->error) {
-					trigger_error($mysqli->error);
+				$stmt->bind_param('si', $matchid, $timestamp);
+
+				if (!$stmt->execute()) {
+					Logger::logError('Error executing MySQL query: '. $stmt->error);
 					return false;
 				}
+
+				$result = $stmt->get_result();
+
 				while($row = $result->fetch_array()) {
 					$array[] = $row;
 				}
@@ -1191,6 +1213,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Recovering the match: ' . $matchid );
 					Logger::log('Recovering the match: ' . $matchid);
 					$this->MatchStart();
+					return true;
 				} else {
 					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'No data found from the last round');
 				}
@@ -1200,6 +1223,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		} else {
 			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Match not found');
 		}
+
+		return false;
 	}
 
 	/**
@@ -1677,41 +1702,67 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					$settings = json_encode($this->maniaControl->getClient()->getModeScriptSettings());
 					$mysqli = $this->maniaControl->getDatabase()->getMysqli();
 
-					$query = 'INSERT INTO `' . self::DB_ROUNDSINDEX . '`
+					$mysqli->begin_transaction();
+
+					$playercount = $this->maniaControl->getPlayerManager()->getPlayerCount();
+					$spectatorcount = $this->maniaControl->getPlayerManager()->getSpectatorCount();
+
+					$stmt = $mysqli->prepare('INSERT INTO `' . self::DB_ROUNDSINDEX . '`
 						(`matchid`,`timestamp`,`nbmaps`,`nbrounds`,`settings`,`map`,`nbplayers`,`nbspectators`)
-						VALUES
-						("'. $this->matchid . '","' . $timestamp . '","' . $this->nbmaps . '","' . $this->nbrounds . '",' . "'" . $settings . "'" . ',"' . $this->currentmap->uid . '","' . $this->maniaControl->getPlayerManager()->getPlayerCount() . '","' . $this->maniaControl->getPlayerManager()->getSpectatorCount() . '")';
-					$mysqli->query($query);
-					if ($mysqli->error) {
-						trigger_error($mysqli->error);
+						VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+					$stmt->bind_param('siiissii', $this->matchid, $timestamp, $this->nbmaps, $this->nbrounds, $settings, $this->currentmap->uid, $playercount, $spectatorcount);
+					if (!$stmt->execute()) {
+						Logger::logError('Error executing MySQL query: '. $stmt->error);
 					}
+					$stmt->close();
 
 					// Round data
-					$dbquery = 'INSERT INTO `' . self::DB_ROUNDSDATA . '` (`matchid`,`timestamp`,`rank`,`login`,`matchpoints`,`mappoints`,`roundpoints`,`bestracetime`,`bestracecheckpoints`,`bestlaptime`,`bestlapcheckpoints`,`prevracetime`,`prevracecheckpoints`,`teamid`) VALUES ';
-					foreach ($this->currentscore as $value) {
-						$dbquery .= '("' . $this->matchid . '","' . $timestamp . '","' . implode('","',$value) . '"),';
+					$stmt = $mysqli->prepare('INSERT INTO `' . self::DB_ROUNDSDATA . '` 
+						(`matchid`,`timestamp`,`rank`,`login`,`matchpoints`,`mappoints`,`roundpoints`,`bestracetime`,`bestracecheckpoints`,`bestlaptime`,`bestlapcheckpoints`,`prevracetime`,`prevracecheckpoints`,`teamid`) 
+						VALUES (?, ?, ?, ?, ? ,? ,? ,?, ? ,? ,? ,? ,?, ?)');
+					$stmt->bind_param('siisiiiisisisi', 
+						$this->matchid, 
+						$timestamp, 
+						$rank, 
+						$login, 
+						$matchpoints, 
+						$mappoints, 
+						$roundpoints, 
+						$bestracetime,
+						$bestracecheckpoints,
+						$bestlaptime,
+						$bestlapcheckpoints,
+						$prevracetime,
+						$prevracecheckpoints,
+						$teamid
+					);
+					
+					foreach ($this->currentscore as $score) {
+						list($rank, $login, $matchpoints, $mappoints, $roundpoints, $bestracetime, $bestracecheckpoints, $bestlaptime, $bestlapcheckpoints, $prevracetime, $prevracecheckpoints, $teamid) = $score;
+
+						if (!$stmt->execute()) {
+							Logger::logError('Error executing MySQL query: '. $stmt->error);
+						}
 					}
-					$dbquery = substr($dbquery, 0, -1);
-					$mysqli->query($dbquery);
-					if ($mysqli->error) {
-						trigger_error($mysqli->error);
-					}
+					$stmt->close();
 
 					// Teams Rounds data
 					if (count($teamresults) > 1) {
-						$teamdbquery = 'INSERT INTO `' . self::DB_TEAMSDATA . '` (`matchid`,`timestamp`,`rank`,`id`,`team`,`matchpoints`,`mappoints`,`roundpoints`) VALUES ';
-						foreach ($this->currentteamsscore as $value) {
-							$teamdbquery .= '("' . $this->matchid . '","' . $timestamp . '","' . implode('","',$value) . '"),';
-						}
-						$teamdbquery = substr($teamdbquery, 0, -1);
+						$stmt = $mysqli->prepare('INSERT INTO `' . self::DB_TEAMSDATA . '` (`matchid`,`timestamp`,`rank`,`id`,`team`,`matchpoints`,`mappoints`,`roundpoints`) 
+							VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+						$stmt->bind_param('siiisiii', $this->matchid, $timestamp, $rank, $teamid, $teamname, $matchpoints, $mappoints, $roundpoints);
 
-						$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-						// Teams data
-						$mysqli->query($teamdbquery);
-						if ($mysqli->error) {
-							trigger_error($mysqli->error);
+
+						foreach ($this->currentteamsscore as $score) {
+							list($rank, $teamid, $teamname, $matchpoints, $mappoints, $roundpoints) = $score;
+
+							if (!$stmt->execute()) {
+								Logger::logError('Error executing MySQL query: '. $stmt->error);
+							}
 						}
+						$stmt->close();
 					}
+					$mysqli->commit();
 
 					Logger::log("Rounds finished: " . $this->nbrounds);
 					$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_ENDROUND, $this->matchid, $this->currentscore, $this->currentteamsscore);
@@ -1908,13 +1959,19 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			} elseif (strcasecmp($text[1], "Red") == 0 || $text[1] == "1") {
 				$this->maniaControl->getModeScriptEventManager()->setTrackmaniaTeamPoints("1", "", $text[2]	, $text[2]);
 				$this->maniaControl->getChat()->sendSuccess($this->chatprefix . '$<$f00Red$> Team now has $<$ff0' . $text[2] . '$> points!');
-			} elseif (is_numeric($text[1])) {//TODO: add support of name of teams (need update from NADEO)
+			} elseif (is_numeric($text[1])) { //TODO: add support of name of teams (need update from NADEO)
 				$this->maniaControl->getModeScriptEventManager()->setTrackmaniaTeamPoints($text[1], "", $text[2]	, $text[2]);
 				$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Team ' . $text[1] . ' now has $<$ff0' . $text[2] . '$> points!');
 			} else {
 				$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-				$query = 'SELECT login FROM `' . PlayerManager::TABLE_PLAYERS . '` WHERE nickname LIKE "' . $text[1] . '"';
-				$result = $mysqli->query($query);
+				$stmt = $mysqli->prepare('SELECT login FROM `' . PlayerManager::TABLE_PLAYERS . '` WHERE nickname LIKE ?');
+				$stmt->bind_param('s', $text[1]);
+
+				if (!$stmt->execute()) {
+					Logger::logError('Error executing MySQL query: '. $stmt->error);
+				}
+
+				$result = $stmt->get_result();
 				$array = mysqli_fetch_array($result);
 
 				if (isset($array[0])) {
