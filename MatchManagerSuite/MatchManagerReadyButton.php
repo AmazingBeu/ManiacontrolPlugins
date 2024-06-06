@@ -230,13 +230,13 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 					$this->closeReadyWidget($player->login);
 				} else if (!$player->isSpectator && !isset($this->playersreadystate[$player->login])) {
 					$this->playersreadystate[$player->login] = 0;
-					$this->maniaControl->getManialinkManager()->sendManialink($this->MLisNotReady, $player->login);
+					$this->maniaControl->getManialinkManager()->sendManialink($this->MLisNotReady, $player->login, ToggleUIFeature: false);
 					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'You can now set you $<$f00Ready$> by clicking on the button', $player);
 				} else if (!$player->isSpectator && isset($this->playersreadystate[$player->login])) {
 					if ($this->playersreadystate[$player->login] == 1) {
-						$this->maniaControl->getManialinkManager()->sendManialink($this->MLisReady, $player->login);
+						$this->maniaControl->getManialinkManager()->sendManialink($this->MLisReady, $player->login, ToggleUIFeature: false);
 					} else {
-						$this->maniaControl->getManialinkManager()->sendManialink($this->MLisNotReady, $player->login);
+						$this->maniaControl->getManialinkManager()->sendManialink($this->MLisNotReady, $player->login, ToggleUIFeature: false);
 					}
 				}
 			}
