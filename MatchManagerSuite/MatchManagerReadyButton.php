@@ -17,7 +17,7 @@ use ManiaControl\Plugins\PluginManager;
 use ManiaControl\Settings\Setting;
 use ManiaControl\Settings\SettingManager;
 use ManiaControl\Commands\CommandListener;
-
+use Maniaplanet\DedicatedServer\InvalidArgumentException;
 
 if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
 	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
@@ -37,7 +37,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 158;
-	const PLUGIN_VERSION									= 1.3;
+	const PLUGIN_VERSION									= 1.4;
 	const PLUGIN_NAME										= 'MatchManager Ready Button';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -134,6 +134,10 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERDISCONNECT, $this, 'handlePlayerDisconnect');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERINFOCHANGED, $this, 'displayReadyWidgetIfNeeded');
+
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STARTMATCH, $this, 'handleMatchManagerCoreCallback');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_ENDMATCH, $this, 'handleMatchManagerCoreCallback');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STOPMATCH, $this, 'handleMatchManagerCoreCallback');
 
 		// Register ManiaLink Pages
 		$this->maniaControl->getManialinkManager()->registerManialinkPageAnswerListener(self::ACTION_READY, $this, 'handleReady');
@@ -300,6 +304,14 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 		}
 	}
 
+	/**
+	 * handleMatchManagerCoreCallback
+	 * 
+	 * @return void 
+	 */
+	public function handleMatchManagerCoreCallback() {
+		$this->displayReadyWidgetIfNeeded();
+	}
 
 	/**
 	 * Generate Manialinks variables

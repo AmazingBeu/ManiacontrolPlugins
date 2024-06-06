@@ -38,7 +38,7 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	 * Constants
 	 */
 	const PLUGIN_ID											= 159;
-	const PLUGIN_VERSION									= 1.3;
+	const PLUGIN_VERSION									= 1.4;
 	const PLUGIN_NAME										= 'MatchManager Players Pause';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -137,6 +137,10 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERDISCONNECT, $this, 'handlePlayerDisconnect');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERINFOCHANGED, $this, 'displayPauseWidgetIfNeeded');
+
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STARTMATCH, $this, 'handleMatchManagerCoreCallback');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_ENDMATCH, $this, 'handleMatchManagerCoreCallback');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STOPMATCH, $this, 'handleMatchManagerCoreCallback');
 
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_STARTROUNDSTART, $this, 'handleBeginRoundCallback');
 
@@ -326,6 +330,15 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 		} else {
 			$this->displayPauseWidgetIfNeeded();
 		}
+	}
+
+	/**
+	 * handleMatchManagerCoreCallback
+	 * 
+	 * @return void 
+	 */
+	public function handleMatchManagerCoreCallback() {
+		$this->displayPauseWidgetIfNeeded();
 	}
 
 	/**
