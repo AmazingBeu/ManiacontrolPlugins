@@ -38,7 +38,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 5.1;
+	const PLUGIN_VERSION									= 5.2;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -1059,6 +1059,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 */
 	public function MatchEnd() {
 		try {
+			// Since now, we conside the match not started
+			$this->matchStarted = false;
+
 			// Load TimeAttack gamemode if possible
 			$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_POST_MATCH_MAPLIST);
 			if (is_file($this->maniaControl->getServer()->getDirectory()->getMapsFolder() . $maplist)) {
@@ -1114,6 +1117,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		}
 
 		try {
+			// Since now, we conside the match not started
+			$this->matchStarted = false;
+
 			// Trigger Callback
 			$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_STOPMATCH, $this->matchid, $this->currentscore, $this->currentteamsscore);
 
