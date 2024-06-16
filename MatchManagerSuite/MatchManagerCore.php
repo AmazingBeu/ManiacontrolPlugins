@@ -38,7 +38,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 5.2;
+	const PLUGIN_VERSION									= 5.3;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -745,6 +745,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	public function resetMatchVariables() {
 		$this->matchStarted		= false;
 		$this->matchrecover		= false;
+		$this->pauseon			= false;
 		$this->pointstorecover	= array();
 		$this->currentscore		= array();
 		$this->preendroundscore	= array();
@@ -1124,6 +1125,11 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_STOPMATCH, $this->matchid, $this->currentscore, $this->currentteamsscore);
 
 			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Match stopped by an Admin!');
+
+			// Cancel pause if match stopped during a pause
+			if ($this->pauseon) {
+				$this->unsetNadeoPause();
+			}
 
 			// Load TimeAttack gamemode if possible
 			$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_POST_MATCH_MAPLIST);
