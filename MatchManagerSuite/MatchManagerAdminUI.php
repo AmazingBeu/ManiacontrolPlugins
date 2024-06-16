@@ -25,9 +25,6 @@ use ManiaControl\Callbacks\CallbackManager;
 use ManiaControl\Players\Player;
 use ManiaControl\Players\PlayerManager;
 
-use ManiaControl\Script\InvokeScriptCallback;
-
-
 if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
 	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
 	Logger::logError('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
@@ -45,7 +42,7 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	 * Constants
 	 */
 	const PLUGIN_ID											= 174;
-	const PLUGIN_VERSION									= 1;
+	const PLUGIN_VERSION									= 1.1;
 	const PLUGIN_NAME										= 'MatchManager Admin UI';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -132,33 +129,8 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 			throw new \Exception('MatchManager Core is needed to use ' . self::PLUGIN_NAME);
 		}
 
-		if ($this->maniaControl->getPluginManager()->getSavedPluginStatus(self::MATCHMANAGERCORE_PLUGIN)) {
-			// plugin are loaded in alphabetic order, just wait 1 sec before trying to load MatchManager Core
-			$this->maniaControl->getTimerManager()->registerOneTimeListening($this, function () {
-				$this->MatchManagerCore = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERCORE_PLUGIN);
-				if ($this->MatchManagerCore === null) {
-					$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is needed to use ' . self::PLUGIN_NAME . ' plugin.');
-					$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
-				} else {
-					$this->generateManialink();
-					$this->displayManialink();
-				}
-			}, 1000);
-		} else {
-			throw new \Exception('MatchManager Core is needed to use ' . self::PLUGIN_NAME);
-		}
-
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_LOADED, $this, 'handlePluginLoaded');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_UNLOADED, $this, 'handlePluginUnloaded');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
-
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_STARTMATCHSTART, $this, 'generateManialink');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STARTMATCH, $this, 'generateManialink');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_ENDMATCH, $this, 'generateManialink');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STOPMATCH, $this, 'generateManialink');
-
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(CallbackManager::CB_MP_PLAYERMANIALINKPAGEANSWER, $this, 'handleManialinkPageAnswer');
+		// All callbacks are loaded in handleAfterInit
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::AFTERINIT, $this, 'handleAfterInit');
 
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_POSX, 156., "");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_POSY, 24., "");
@@ -171,6 +143,37 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	 */
 	public function unload() {
 		$this->maniaControl->getManialinkManager()->hideManialink(self::MLID_ADMINUI_SIDEMENU);
+	}
+
+	/**
+	 * handleAfterInit
+	 * 
+	 * Plugins are loaded alphabetically, so we have to we wait they are all loaded before check.
+	 * 
+	 * @return void 
+	 */
+	public function handleAfterInit() {
+		$this->MatchManagerCore = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERCORE_PLUGIN);
+		if ($this->MatchManagerCore === null) {
+			$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is needed to use ' . self::PLUGIN_NAME . ' plugin.');
+			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
+			return;
+		}
+
+		$this->generateManialink();
+		$this->displayManialink();
+
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_LOADED, $this, 'handlePluginLoaded');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_UNLOADED, $this, 'handlePluginUnloaded');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
+
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_STARTMATCHSTART, $this, 'generateManialink');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STARTMATCH, $this, 'generateManialink');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_ENDMATCH, $this, 'generateManialink');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STOPMATCH, $this, 'generateManialink');
+
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(CallbackManager::CB_MP_PLAYERMANIALINKPAGEANSWER, $this, 'handleManialinkPageAnswer');
 	}
 
 	/**
