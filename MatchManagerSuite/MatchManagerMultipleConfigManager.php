@@ -42,7 +42,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 * Constants
 	 */
 	const PLUGIN_ID											= 171;
-	const PLUGIN_VERSION									= 1.2;
+	const PLUGIN_VERSION									= 1.3;
 	const PLUGIN_NAME										= 'MatchManager Multiple Config Manager';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -224,7 +224,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 			case self::ML_ACTION_SAVE_CONFIG:
 				if ($callback[1][3][0]["Value"]) {
 					$this->showConfigListUI(array(), $player);
-					$this->saveConfig($callback[1][3]);
+					$this->saveCurrentConfig($callback[1][3]);
 					$this->showConfigListUI(array(), $player);
 				}
 			break;
@@ -295,12 +295,12 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	}
 
 	/**
-	 * saveConfig
+	 * saveCurrentConfig
 	 *
 	 * @param  array $fields
 	 * @return void
 	 */
-	public function saveConfig(array $fields) {
+	public function saveCurrentConfig(array $fields) {
 		Logger::log("[MatchManagerMultipleConfigManager] Saving current config");
 		$result = array();
 		$configname = "";
@@ -331,15 +331,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 			return;
 		}
 
-		$config = json_encode($result);
-
-		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-		$query = $mysqli->prepare('INSERT INTO `' . self::DB_MATCHCONFIG . '` (`name`,`gamemodebase`,`config`) VALUES (?, ?, ?);');
-		$query->bind_param('sss', $configname, $gamemodebase, $config);
-		if (!$query->execute()) {
-			trigger_error('Error executing MySQL query: ' . $query->error);
-		}
-		$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_LOADCONFIG, $configname);
+		$this->saveConfig($configname, $gamemodebase, json_encode($result));
 	}
 
 	public function getSavedConfigs() {
@@ -353,6 +345,15 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 		return $result->fetch_all(MYSQLI_ASSOC);
 	}
 
+	public function saveConfig($configname, $gamemodebase, $config) {
+		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
+		$query = $mysqli->prepare('INSERT INTO `' . self::DB_MATCHCONFIG . '` (`name`,`gamemodebase`,`config`) VALUES (?, ?, ?);');
+		$query->bind_param('sss', $configname, $gamemodebase, $config);
+		if (!$query->execute()) {
+			trigger_error('Error executing MySQL query: ' . $query->error);
+		}
+		$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_SAVECONFIG, $configname);
+	}
 
 	/**
 	 * Shows a ManiaLink list with the local records.
@@ -472,7 +473,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 			self::ML_ACTION_SAVE_CONFIG_PAGE
 		);
 		$frame->addChild($mapNameButton);
-		$mapNameButton->setPosition(-$width / 2 + 110, -36);
+		$mapNameButton->setPosition(-$width / 2 + 110, -$height / 2 + 6);
 
 		// Render and display xml
 		$this->maniaControl->getManialinkManager()->displayWidget($maniaLink, $player, self::ML_ID);
@@ -580,13 +581,13 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 			self::ML_ACTION_SAVE_CONFIG
 		);
 		$frame->addChild($mapNameButton);
-		$mapNameButton->setPosition(-$width / 2 + 60, -35);
+		$mapNameButton->setPosition(-$width / 2 + 60, -$height / 2 + 5);
 
 		$entry = new Entry();
 		$frame->addChild($entry);
 		$entry->setStyle(Label_Text::STYLE_TextValueSmall);
 		$entry->setHorizontalAlign($entry::LEFT);
-		$entry->setPosition(-$width / 2 + 80, -35);
+		$entry->setPosition(-$width / 2 + 80, -$height / 2 + 5);
 		$entry->setTextSize(1);
 		$entry->setSize($width * 0.25, 4);
 		$entry->setName(self::ML_NAME_CONFIGNAME);
