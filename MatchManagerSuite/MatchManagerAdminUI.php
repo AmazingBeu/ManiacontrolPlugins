@@ -42,7 +42,7 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	 * Constants
 	 */
 	const PLUGIN_ID											= 174;
-	const PLUGIN_VERSION									= 1.1;
+	const PLUGIN_VERSION									= 1.2;
 	const PLUGIN_NAME										= 'MatchManager Admin UI';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -130,7 +130,7 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 		}
 
 		// All callbacks are loaded in handleAfterInit
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::AFTERINIT, $this, 'handleAfterInit');
+		$this->maniaControl->getTimerManager()->registerOneTimeListening($this, 'afterPluginInit', 1);
 
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_POSX, 156., "");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_POSY, 24., "");
@@ -146,13 +146,13 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	}
 
 	/**
-	 * handleAfterInit
-	 * 
+	 * afterPluginInit
 	 * Plugins are loaded alphabetically, so we have to we wait they are all loaded before check.
+	 * We can't use AFTER_INIT Callback to make it visible when enabled manually
 	 * 
 	 * @return void 
 	 */
-	public function handleAfterInit() {
+	public function afterPluginInit() {
 		$this->MatchManagerCore = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERCORE_PLUGIN);
 		if ($this->MatchManagerCore === null) {
 			$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is needed to use ' . self::PLUGIN_NAME . ' plugin.');
