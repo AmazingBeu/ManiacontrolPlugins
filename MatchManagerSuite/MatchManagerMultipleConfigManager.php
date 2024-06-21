@@ -334,6 +334,10 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 		$this->saveConfig($configname, $gamemodebase, json_encode($result));
 	}
 
+	/**
+	 * getSavedConfigs
+	 * @return array 
+	 */
 	public function getSavedConfigs() {
 		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
 		$query = 'SELECT `id`,`name`,`gamemodebase`,`date` FROM `' . self::DB_MATCHCONFIG . '` ORDER BY id DESC';
@@ -345,7 +349,14 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 		return $result->fetch_all(MYSQLI_ASSOC);
 	}
 
-	public function saveConfig($configname, $gamemodebase, $config) {
+	/**
+	 * saveConfig
+	 * @param string $configname 
+	 * @param string $gamemodebase 
+	 * @param string $config 
+	 * @return void 
+	 */
+	public function saveConfig(string $configname, string $gamemodebase, string $config) {
 		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
 		$query = $mysqli->prepare('INSERT INTO `' . self::DB_MATCHCONFIG . '` (`name`,`gamemodebase`,`config`) VALUES (?, ?, ?);');
 		$query->bind_param('sss', $configname, $gamemodebase, $config);
