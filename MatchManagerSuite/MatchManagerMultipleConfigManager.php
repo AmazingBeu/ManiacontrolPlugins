@@ -42,7 +42,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 * Constants
 	 */
 	const PLUGIN_ID											= 171;
-	const PLUGIN_VERSION									= 1.3;
+	const PLUGIN_VERSION									= 1.4;
 	const PLUGIN_NAME										= 'MatchManager Multiple Config Manager';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -364,6 +364,21 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 			trigger_error('Error executing MySQL query: ' . $query->error);
 		}
 		$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_SAVECONFIG, $configname);
+	}
+
+	/**
+	 * getConfig
+	 * @param string $name 
+	 * @return object|null config 
+	 */
+	public function getConfig(string $name) {
+		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
+		$stmt = $mysqli->prepare('SELECT id FROM `' . self::DB_MATCHCONFIG . '` WHERE `name` = ? LIMIT 1;');
+		$stmt->bind_param('s', $name);
+		if (!$stmt->execute()) {
+			trigger_error('Error executing MySQL query: ' . $stmt->error);
+		}
+		return $stmt->get_result()->fetch_object();
 	}
 
 	/**
