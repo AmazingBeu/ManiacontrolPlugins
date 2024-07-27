@@ -38,7 +38,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 5.3;
+	const PLUGIN_VERSION									= 5.4;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -47,6 +47,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	const DB_ROUNDSINDEX									= 'MatchManager_RoundsIndex';
 	const DB_ROUNDSDATA										= 'MatchManager_RoundsData';
 	const DB_TEAMSDATA										= 'MatchManager_TeamsData';
+	const DB_MATCHESRESULT									= 'MatchManager_MatchesResult';
+	const DB_MATCHESTEAMSRESULT								= 'MatchManager_MatchesTeamsResult';
 	const MLID_MATCH_PAUSE_WIDGET							= 'Pause Widget';
 
 	// Internal Callback Trigger
@@ -528,6 +530,30 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			`matchpoints` INT(10) NOT NULL,
 			`mappoints` INT(10) NOT NULL,
 			`roundpoints` INT(10) NOT NULL
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;';
+		$mysqli->query($query);
+		if ($mysqli->error) {
+			trigger_error($mysqli->error, E_USER_ERROR);
+		}
+		$query = 'CREATE TABLE IF NOT EXISTS `' . self::DB_MATCHESRESULT . '` (
+			`matchid` VARCHAR(100) NOT NULL,
+			`timestamp` INT(10) NOT NULL,
+			`rank` INT(4) NOT NULL,
+			`login` VARCHAR(36) NOT NULL,
+			`matchpoints` INT(10) NOT NULL,
+			`teamid` INT(3) NOT NULL
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;';
+		$mysqli->query($query);
+		if ($mysqli->error) {
+			trigger_error($mysqli->error, E_USER_ERROR);
+		}
+		$query = 'CREATE TABLE IF NOT EXISTS `' . self::DB_MATCHESTEAMSRESULT . '` (
+			`matchid` VARCHAR(100) NOT NULL,
+			`timestamp` INT(10) NOT NULL,
+			`rank` INT(3) NOT NULL,
+			`id` INT(3) NOT NULL,
+			`team` VARCHAR(30) NOT NULL,
+			`matchpoints` INT(10) NOT NULL
 			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;';
 		$mysqli->query($query);
 		if ($mysqli->error) {
@@ -1079,16 +1105,58 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				}
 			}
 
+			// MYSQL DATA INSERT
 			$timestamp = time();
 
-			// MYSQL DATA INSERT
 			$mysqli = $this->maniaControl->getDatabase()->getMysqli();
+			$mysqli->begin_transaction();
+
 			$stmt = $mysqli->prepare('UPDATE `' . self::DB_MATCHESINDEX . '` SET `ended` = ? WHERE `matchid` = ?');
 			$stmt->bind_param('is', $timestamp, $this->matchid);
 
 			if (!$stmt->execute()) {
 				Logger::logError('Error executing MySQL query: '. $stmt->error);
 			}
+
+			// Match Result
+			$stmt = $mysqli->prepare('INSERT INTO `' . self::DB_MATCHESRESULT . '` 
+				(`matchid`,`timestamp`,`rank`,`login`,`matchpoints`,`teamid`) 
+				VALUES (?, ?, ?, ?, ? ,?)');
+			$stmt->bind_param('siisii', 
+				$this->matchid, 
+				$timestamp, 
+				$rank, 
+				$login, 
+				$matchpoints, 
+				$teamid
+			);
+			
+			foreach ($this->currentscore as $score) {
+				list($rank, $login, $matchpoints, $mappoints, $roundpoints, $bestracetime, $bestracecheckpoints, $bestlaptime, $bestlapcheckpoints, $prevracetime, $prevracecheckpoints, $teamid) = $score;
+
+				if (!$stmt->execute()) {
+					Logger::logError('Error executing MySQL query: '. $stmt->error);
+				}
+			}
+			$stmt->close();
+
+			// Teams Rounds data
+			if (count($this->currentteamsscore) > 1) {
+				$stmt = $mysqli->prepare('INSERT INTO `' . self::DB_MATCHESTEAMSRESULT . '` (`matchid`,`timestamp`,`rank`,`id`,`team`,`matchpoints`) 
+					VALUES (?, ?, ?, ?, ?, ?)');
+				$stmt->bind_param('siiisi', $this->matchid, $timestamp, $rank, $teamid, $teamname, $matchpoints);
+
+
+				foreach ($this->currentteamsscore as $score) {
+					list($rank, $teamid, $teamname, $matchpoints) = $score;
+
+					if (!$stmt->execute()) {
+						Logger::logError('Error executing MySQL query: '. $stmt->error);
+					}
+				}
+				$stmt->close();
+			}
+			$mysqli->commit();
 
 			// Trigger Callback
 			$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_ENDMATCH, $this->matchid, $this->currentscore, $this->currentteamsscore);
@@ -1604,113 +1672,18 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 		if ($this->matchStarted && $this->settingsloaded && !$this->postmatch) {
 			Logger::log("Section: " . $structure->getSection());
-			if ($structure->getSection() == "EndMatchEarly") {
+			if ($structure->getSection() == "EndMatchEarly" || $structure->getSection() == "EndMatch") {
+				$this->computeCurrentScores($structure);
 				$this->MatchEnd();
 			} elseif ($structure->getSection() == "EndMap" && $this->hidenextmaps && isset($this->maps[$this->nbmaps])) {
 				$this->maniaControl->getClient()->addMap($this->maps[$this->nbmaps]);
 			} elseif ($structure->getSection() == "PreEndRound") {
 				$this->preendroundscore = $structure;
 			} elseif ($structure->getSection() == "EndRound") {
-				$timestamp = time();
-
 				if ($this->nbmaps != 0 && ($this->nbrounds <= $this->settings_nbroundsbymap || $this->settings_nbroundsbymap <= 0)) {
-					//
-					// Players Scores
-					//
-					$this->currentscore = array();
-					$results = $structure->getPlayerScores();
+					$this->computeCurrentScores($structure);
 
-					if  ($this->currentgmbase == "RoyalTimeAttack") {
-						$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
-						Logger::Log("No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
-					}
-
-					$preendroundplayersscore = [];
-					$preendroundteamsscore = [];
-					if ($this->preendroundscore !== null) {
-						$preendroundplayersscore = $this->preendroundscore->getPlayerScores();
-						$preendroundteamsscore = $this->preendroundscore->getTeamScores();;
-					}
-					$this->preendroundscore = null;
-
-					//$rank = 1;
-					foreach ($results as $result) {
-						/** @var \ManiaControl\Callbacks\Structures\TrackMania\Models\PlayerScore $result */
-						$rank 					= $result->getRank();
-						$player					= $result->getPlayer();
-						$matchpoints			= $result->getMatchPoints();
-						$mappoints				= $result->getMapPoints();
-						$roundpoints			= $result->getRoundPoints();
-						$bestracetime			= $result->getBestRaceTime();
-						$bestracecheckpoints	= implode(",", $result->getBestRaceCheckpoints());
-						$bestlaptime			= $result->getBestLapTime();
-						$bestlapcheckpoints		= implode(",", $result->getBestLapCheckpoints());
-						$prevracetime			= $result->getPrevRaceTime();
-						$prevracecheckpoints	= implode(",", $result->getPrevRaceCheckpoints());
-
-						if (count($preendroundplayersscore) > 0) {
-							$preendroundarray = array_filter($preendroundplayersscore, function ($e) use ($player) { return $e->getPlayer() === $player ; });
-
-							foreach ($preendroundarray as $key => $preendround) {
-								if ($roundpoints == 0 && $preendround->getRoundPoints() != 0) {
-									$roundpoints = $preendround->getRoundPoints();
-								}
-								if ($mappoints == 0 && $preendround->getMapPoints() != 0) {
-									$mappoints = $preendround->getMapPoints();
-								}
-								unset($preendroundplayersscore[$key]);
-								break;
-							}
-						}
-
-						$this->currentscore = array_merge($this->currentscore, array(
-							array($rank, $player->login, $matchpoints, $mappoints, $roundpoints, $bestracetime, $bestracecheckpoints, $bestlaptime, $bestlapcheckpoints, $prevracetime, $prevracecheckpoints, $player->teamId)
-						));
-					}
-
-					//
-					// Teams Scores
-					//
-					$this->currentteamsscore = array();
-					$teamresults = $structure->getTeamScores();
-
-					if (count($teamresults) > 1) {
-						// Resort scores
-						usort($teamresults, function ($a, $b) { return -($a->getMatchPoints() <=> $b->getMatchPoints()); });
-
-						$rank = 1;
-						foreach ($teamresults as $teamresult) {
-							$teamid					= $teamresult->getTeamId();
-							$teamname				= $teamresult->getName();
-							$matchpoints			= $teamresult->getMatchPoints();
-							$mappoints				= $teamresult->getMapPoints();
-							$roundpoints			= $teamresult->getRoundPoints();
-
-							if (count($preendroundteamsscore) > 0) {
-								$preendroundarray = array_filter($preendroundteamsscore, function ($e) use ($teamid) { return $e->getTeamId() === $teamid ; });
-	
-								foreach ($preendroundarray as $key => $preendround) {
-									if ($roundpoints == 0 && $preendround->getRoundPoints() != 0) {
-										$roundpoints = $preendround->getRoundPoints();
-									}
-									if ($mappoints == 0 && $preendround->getMapPoints() != 0) {
-										$mappoints = $preendround->getMapPoints();
-									}
-									unset($preendroundteamsscore[$key]);
-									break;
-								}
-							}
-
-							$this->currentteamsscore = array_merge($this->currentteamsscore, array(
-								array($rank, $teamid, $teamname, $matchpoints, $mappoints, $roundpoints)
-							));
-							$rank++;
-						}
-					}
-
-					//
-					// MySQL queries
-					//
+					$timestamp = time();
 					$settings = json_encode($this->maniaControl->getClient()->getModeScriptSettings());
 					$mysqli = $this->maniaControl->getDatabase()->getMysqli();
 
@@ -1759,7 +1732,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					$stmt->close();
 
 					// Teams Rounds data
-					if (count($teamresults) > 1) {
+					if (count($this->currentteamsscore) > 1) {
 						$stmt = $mysqli->prepare('INSERT INTO `' . self::DB_TEAMSDATA . '` (`matchid`,`timestamp`,`rank`,`id`,`team`,`matchpoints`,`mappoints`,`roundpoints`) 
 							VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
 						$stmt->bind_param('siiisiii', $this->matchid, $timestamp, $rank, $teamid, $teamname, $matchpoints, $mappoints, $roundpoints);
@@ -1781,6 +1754,101 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				}
 			}
 			return true;
+		}
+	}
+
+	private function computeCurrentScores(OnScoresStructure $structure) {
+		//
+		// Players Scores
+		//
+		$this->currentscore = array();
+		$results = $structure->getPlayerScores();
+
+		if  ($this->currentgmbase == "RoyalTimeAttack") {
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
+			Logger::Log("No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
+		}
+
+		$preendroundplayersscore = [];
+		$preendroundteamsscore = [];
+		if ($this->preendroundscore !== null) {
+			$preendroundplayersscore = $this->preendroundscore->getPlayerScores();
+			$preendroundteamsscore = $this->preendroundscore->getTeamScores();
+		}
+		$this->preendroundscore = null;
+
+		foreach ($results as $result) {
+			/** @var \ManiaControl\Callbacks\Structures\TrackMania\Models\PlayerScore $result */
+			$rank 					= $result->getRank();
+			$player					= $result->getPlayer();
+			$matchpoints			= $result->getMatchPoints();
+			$mappoints				= $result->getMapPoints();
+			$roundpoints			= $result->getRoundPoints();
+			$bestracetime			= $result->getBestRaceTime();
+			$bestracecheckpoints	= implode(",", $result->getBestRaceCheckpoints());
+			$bestlaptime			= $result->getBestLapTime();
+			$bestlapcheckpoints		= implode(",", $result->getBestLapCheckpoints());
+			$prevracetime			= $result->getPrevRaceTime();
+			$prevracecheckpoints	= implode(",", $result->getPrevRaceCheckpoints());
+
+			if (count($preendroundplayersscore) > 0) {
+				$preendroundarray = array_filter($preendroundplayersscore, function ($e) use ($player) { return $e->getPlayer() === $player ; });
+
+				foreach ($preendroundarray as $key => $preendround) {
+					if ($roundpoints == 0 && $preendround->getRoundPoints() != 0) {
+						$roundpoints = $preendround->getRoundPoints();
+					}
+					if ($mappoints == 0 && $preendround->getMapPoints() != 0) {
+						$mappoints = $preendround->getMapPoints();
+					}
+					unset($preendroundplayersscore[$key]);
+					break;
+				}
+			}
+
+			$this->currentscore = array_merge($this->currentscore, array(
+				array($rank, $player->login, $matchpoints, $mappoints, $roundpoints, $bestracetime, $bestracecheckpoints, $bestlaptime, $bestlapcheckpoints, $prevracetime, $prevracecheckpoints, $player->teamId)
+			));
+		}
+
+		//
+		// Teams Scores
+		//
+		$this->currentteamsscore = array();
+		$teamresults = $structure->getTeamScores();
+
+		if (count($teamresults) > 1) {
+			// Resort scores
+			usort($teamresults, function ($a, $b) { return -($a->getMatchPoints() <=> $b->getMatchPoints()); });
+
+			$rank = 1;
+			foreach ($teamresults as $teamresult) {
+				$teamid					= $teamresult->getTeamId();
+				$teamname				= $teamresult->getName();
+				$matchpoints			= $teamresult->getMatchPoints();
+				$mappoints				= $teamresult->getMapPoints();
+				$roundpoints			= $teamresult->getRoundPoints();
+
+				if (count($preendroundteamsscore) > 0) {
+					$preendroundarray = array_filter($preendroundteamsscore, function ($e) use ($teamid) { return $e->getTeamId() === $teamid ; });
+
+					foreach ($preendroundarray as $key => $preendround) {
+						if ($roundpoints == 0 && $preendround->getRoundPoints() != 0) {
+							$roundpoints = $preendround->getRoundPoints();
+						}
+						if ($mappoints == 0 && $preendround->getMapPoints() != 0) {
+							$mappoints = $preendround->getMapPoints();
+						}
+						unset($preendroundteamsscore[$key]);
+						break;
+					}
+				}
+
+				$this->currentteamsscore = array_merge($this->currentteamsscore, array(
+					array($rank, $teamid, $teamname, $matchpoints, $mappoints, $roundpoints)
+				));
+				$rank++;
+			}
 		}
 	}
 
