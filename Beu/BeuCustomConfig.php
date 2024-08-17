@@ -31,7 +31,7 @@ class BeuCustomConfig implements CallbackListener, Plugin {
 	* Constants
 	*/
 	const PLUGIN_ID			= 193;
-	const PLUGIN_VERSION	= 1.1;
+	const PLUGIN_VERSION	= 1.2;
 	const PLUGIN_NAME		= 'BeuCustomConfig';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -96,7 +96,7 @@ class BeuCustomConfig implements CallbackListener, Plugin {
 	private function changeManiacontrolSettings() {
 		$settingstochange = [
 			AuthenticationManager::class => [
-				MapQueue::SETTING_PERMISSION_ADD_TO_QUEUE => AuthenticationManager::AUTH_LEVEL_ADMIN
+				MapQueue::SETTING_PERMISSION_ADD_TO_QUEUE => AuthenticationManager::AUTH_NAME_ADMIN
 			],
 			UpdateManager::class => [
 				UpdateManager::SETTING_ENABLE_UPDATECHECK => false
