@@ -6,6 +6,7 @@
 !MatchManagerSuite/*
 !Beu
 !Beu/AFKNotifier.php
+!Beu/AutomaticMapSwitcher.php
 !Beu/BeuCustomConfig.php
 !Beu/BeuDonationButton.php
 !Beu/BlacklistManager.php
