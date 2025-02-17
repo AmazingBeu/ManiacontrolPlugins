@@ -22,7 +22,7 @@ class OpenplanetDetector implements ManialinkPageAnswerListener, CallbackListene
 	* Constants
 	*/
 	const PLUGIN_ID			= 203;
-	const PLUGIN_VERSION	= 1.0;
+	const PLUGIN_VERSION	= 1.1;
 	const PLUGIN_NAME		= 'Openplanet Detector';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -136,14 +136,19 @@ class OpenplanetDetector implements ManialinkPageAnswerListener, CallbackListene
         $this->maniaControl->getChat()->sendInformationToAdmins("Player ". $player->nickname ." has the wrong Openplanet Signature: " . $signature);
         Logger::log("Player ". $player->nickname ." has the wrong Openplanet Signature: " . $signature);
 
-        switch ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ACTION)) {
-            case self::ACTION_FORCE_AS_SPEC:
-                $this->maniaControl->getClient()->forceSpectator($player->login, 1);
-                $this->maniaControl->getChat()->sendInformation("Your Openplanet signature is not allowed. Change it and try to re-join the server", $player->login);
-                break;
-            case self::ACTION_KICK:
-                $this->maniaControl->getClient()->kick($player->login, "Your Openplanet signature is not allowed. Change it and try to re-join the server");
-                break;
+        try {
+            switch ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ACTION)) {
+                case self::ACTION_FORCE_AS_SPEC:
+                    $this->maniaControl->getClient()->forceSpectator($player->login, 1);
+                    $this->maniaControl->getChat()->sendInformation("Your Openplanet signature is not allowed. Change it and try to re-join the server", $player->login);
+                    break;
+                case self::ACTION_KICK:
+                    $this->maniaControl->getClient()->kick($player->login, "Your Openplanet signature is not allowed. Change it and try to re-join the server");
+                    break;
+            }
+        } catch (\Throwable $th) {
+            $this->maniaControl->getChat()->sendErrorToAdmins("Can't apply action on ". $player->nickname .": " . $th->getMessage());
+            Logger::logError("Can't apply action on ". $player->nickname .": " . $th->getMessage());
         }
     }
 
