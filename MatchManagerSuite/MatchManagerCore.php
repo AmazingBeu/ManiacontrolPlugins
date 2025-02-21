@@ -38,7 +38,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 5.5;
+	const PLUGIN_VERSION									= 5.6;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -773,8 +773,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->matchrecover		= false;
 		$this->pauseon			= false;
 		$this->pointstorecover	= array();
-		$this->currentscore		= array();
-		$this->preendroundscore	= array();
+		$this->currentscore		= array(); // TODO CHECK
+		$this->preendroundscore	= null;
 		$this->settingsloaded	= false;
 		$this->mapsshuffled		= false;
 		$this->mapshidden		= false;
@@ -2096,7 +2096,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			if (isset($login)) {
 				$player = $this->maniaControl->getPlayerManager()->getPlayer($login,true);
 				if ($player) {
-					$this->maniaControl->getModeScriptEventManager()->setTrackmaniaPlayerPoints($player, "", "", $matchpoints);
+					$this->maniaControl->getModeScriptEventManager()->setTrackmaniaPlayerPoints($player, $roundpoints, $mappoints, $matchpoints);
 					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> now has $<$ff0' . $matchpoints . '$> points!');
 				} else {
 					$this->maniaControl->getChat()->sendError($this->chatprefix . 'Player ' . $target . " isn't connected", $adminplayer);
