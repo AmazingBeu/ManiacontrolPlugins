@@ -23,7 +23,7 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 	 * Constants
 	 */
 	const PLUGIN_ID			= 154;
-	const PLUGIN_VERSION	= 2.1;
+	const PLUGIN_VERSION	= 2.2;
 	const PLUGIN_NAME		= 'Guestlist Manager';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -416,9 +416,9 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 	 * handle Info command
 	 *
 	 * @param array $chat
-	 * @param \ManiaControl\Players\Player $player
+	 * @param \ManiaControl\Players\Player $adminplayer
 	 */
-	public function handleInfo(Array $chat, Player $player) {
+	public function handleInfo(Array $chat, Player $adminplayer) {
 		$guests = array_column($this->maniaControl->getClient()->getGuestList(), 'login');
 		$players = $this->maniaControl->getPlayerManager()->getPlayers(true);
 		$spectators = $this->maniaControl->getPlayerManager()->getSpectators();
@@ -442,7 +442,6 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 				$spectators = array_filter($spectators, function($obj) use ($player) {
 					return $obj !== $player;
 				});
-
 
 				if (!array_key_exists($player->authLevel, $nbPerRole)) {
 					$nbPerRole[$player->authLevel] = 0;
@@ -475,17 +474,16 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 
 		$message .= substr($part1, 0, -3) . substr($part2, 0, -3);
 
-
-		$this->maniaControl->getChat()->sendSuccess($message, $player);
+		$this->maniaControl->getChat()->sendSuccess($message, $adminplayer);
 	}
 
 	/**
 	 * handle List command
 	 *
 	 * @param array $chat
-	 * @param \ManiaControl\Players\Player $player
+	 * @param \ManiaControl\Players\Player $adminplayer
 	 */
-	public function handleList(Array $chat, Player $player) {
+	public function handleList(Array $chat, Player $adminplayer) {
 		$guests = array_column($this->maniaControl->getClient()->getGuestList(), 'login');
 
 		$logins = [];
@@ -524,7 +522,7 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 			$message .= '$<$c00' . $login . '$> ';
 		}
 
-		$this->maniaControl->getChat()->sendSuccess($message, $player);
+		$this->maniaControl->getChat()->sendSuccess($message, $adminplayer);
 	}
 
 	/**
