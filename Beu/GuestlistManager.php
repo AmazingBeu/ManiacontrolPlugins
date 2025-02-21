@@ -23,7 +23,7 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 	 * Constants
 	 */
 	const PLUGIN_ID			= 154;
-	const PLUGIN_VERSION	= 2.0;
+	const PLUGIN_VERSION	= 2.1;
 	const PLUGIN_NAME		= 'Guestlist Manager';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -100,6 +100,9 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 		$this->maniaControl->getCommandManager()->registerCommandListener(['glload', 'loadgl'], $this, 'handleLoad', true, 'Load the guestlist file');
 		$this->maniaControl->getCommandManager()->registerCommandListener(['glclear', 'glclean', 'cleangl'], $this, 'handleClear', true, 'Clear the guestlist');
 		$this->maniaControl->getCommandManager()->registerCommandListener(['glkickall'], $this, 'handleKickAll', true, 'Kick non-guestlisted players');
+		$this->maniaControl->getCommandManager()->registerCommandListener(['glinfo'], $this, 'handleInfo', true, 'Get guestlist info');
+		$this->maniaControl->getCommandManager()->registerCommandListener(['gllist'], $this, 'handleList', true, 'List all guestlisted players');
+
 
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(AuthenticationManager::CB_AUTH_LEVEL_CHANGED, $this, 'handleAuthLevelChanged');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
@@ -407,6 +410,121 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 		Logger::log('All non-guestlisted players kicked by '. $player->nickname);
 		$kicked = $this->kickNonGuestlistedPlayers();
 		$this->maniaControl->getChat()->sendSuccess($kicked . ' players kicked', $player);
+	}
+
+	/**
+	 * handle Info command
+	 *
+	 * @param array $chat
+	 * @param \ManiaControl\Players\Player $player
+	 */
+	public function handleInfo(Array $chat, Player $player) {
+		$guests = array_column($this->maniaControl->getClient()->getGuestList(), 'login');
+		$players = $this->maniaControl->getPlayerManager()->getPlayers(true);
+		$spectators = $this->maniaControl->getPlayerManager()->getSpectators();
+
+		$nbPlayersConnected = 0;
+		$nbSpectatorsConnected = 0;
+		$nbSpectatorsConnected = 0;
+		$nbPerRole[0] = 0;
+		$nbPerRoleConnected[0] = 0;
+
+		foreach ($guests as $login) {
+			$player = $this->maniaControl->getPlayerManager()->getPlayer($login);
+
+			if ($player === null) {
+				$nbPerRole[0]++;
+			} else {
+				$players = array_filter($players, function($obj) use ($player) {
+					return $obj !== $player;
+				});
+
+				$spectators = array_filter($spectators, function($obj) use ($player) {
+					return $obj !== $player;
+				});
+
+
+				if (!array_key_exists($player->authLevel, $nbPerRole)) {
+					$nbPerRole[$player->authLevel] = 0;
+					$nbPerRoleConnected[$player->authLevel] = 0;
+				}
+				$nbPerRole[$player->authLevel]++;
+				if ($player->isConnected) {
+					$nbPerRoleConnected[$player->authLevel]++;
+					if ($player->isSpectator) $nbSpectatorsConnected++;
+					else $nbPlayersConnected++;
+				}
+			}
+		}
+
+		$message = '================ Guestlist info ================';
+		$message .= PHP_EOL . '$<$ee0' . count($guests) . '$> guests in the guestlist. Type //gllist to get the list';
+		$message .= PHP_EOL . '====== Connected on the server:';
+		$message .= PHP_EOL . 'Guestlisted: $<$ee0'. $nbPlayersConnected . '$> players - $<$ee0'. $nbSpectatorsConnected .'$> spectators';
+		$message .= PHP_EOL . 'Not guestlisted: $<$ee0'. count($players) . '$> players - $<$ee0'. count($spectators) .'$> spectators';
+
+		$message .= PHP_EOL . '====== Per role:';
+		ksort($nbPerRole);
+		ksort($nbPerRoleConnected);
+		$part1 = PHP_EOL . 'Connected: ';
+		$part2 = PHP_EOL . 'Disconnected: ';
+		foreach ($nbPerRole as $authLevel => $count) {
+			$part1 .= '$<$ee0'. $nbPerRoleConnected[$authLevel] .'$> '. $this->maniaControl->getAuthenticationManager()->getAuthLevelName($authLevel) .'s - ';
+			$part2 .= '$<$ee0'. $count - $nbPerRoleConnected[$authLevel] .'$> '. $this->maniaControl->getAuthenticationManager()->getAuthLevelName($authLevel) .'s - ';
+		}
+
+		$message .= substr($part1, 0, -3) . substr($part2, 0, -3);
+
+
+		$this->maniaControl->getChat()->sendSuccess($message, $player);
+	}
+
+	/**
+	 * handle List command
+	 *
+	 * @param array $chat
+	 * @param \ManiaControl\Players\Player $player
+	 */
+	public function handleList(Array $chat, Player $player) {
+		$guests = array_column($this->maniaControl->getClient()->getGuestList(), 'login');
+
+		$logins = [];
+		$names = [];
+		$connectedNames = [];
+
+		foreach ($guests as $login) {
+			$player = $this->maniaControl->getPlayerManager()->getPlayer($login);
+
+			if ($player === null || $player->nickname === '') {
+				$logins[] = $login;
+			} else {
+				$names[] = $player->nickname;
+				if ($player->isConnected) {
+					$connectedNames[] = $player->nickname;
+				}
+			}
+		}
+
+		natcasesort($logins);
+		natcasesort($names);
+
+		$message = '================ Guestlist list ================'. PHP_EOL;
+		$message .= '====== Known players:'. PHP_EOL;
+		foreach ($names as $name) {
+			if (in_array($name, $connectedNames)) {
+				$message .= '$<$1c0' . $name . '$> ';
+			} else {
+				$message .= '$<$c00' . $name . '$> ';
+			}
+		}
+
+		$message .= PHP_EOL .'====== Unknown players:'. PHP_EOL;
+
+		foreach ($logins as $login) {
+			$message .= '$<$c00' . $login . '$> ';
+		}
+
+		$this->maniaControl->getChat()->sendSuccess($message, $player);
 	}
 
 	/**
