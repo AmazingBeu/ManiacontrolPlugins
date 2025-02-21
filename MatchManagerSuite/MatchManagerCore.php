@@ -38,7 +38,7 @@ use ManiaControl\Callbacks\TimerListener; // for pause
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
 
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 5.4;
+	const PLUGIN_VERSION									= 5.5;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -2032,51 +2032,78 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$text = $chatCallback[1][2];
 		$text = explode(" ", $text);
 
-		if (isset($text[1]) && isset($text[2]) && is_numeric($text[2]) && $text[2] >= 0 ) {
-			if (strcasecmp($text[1], "Blue") == 0 || $text[1] == "0") { 
-				$this->maniaControl->getModeScriptEventManager()->setTrackmaniaTeamPoints("0", "", $text[2], $text[2]);
-				$this->maniaControl->getChat()->sendSuccess($this->chatprefix . '$<$00fBlue$> Team now has $<$ff0' . $text[2] . '$> points!');
-			} elseif (strcasecmp($text[1], "Red") == 0 || $text[1] == "1") {
-				$this->maniaControl->getModeScriptEventManager()->setTrackmaniaTeamPoints("1", "", $text[2]	, $text[2]);
-				$this->maniaControl->getChat()->sendSuccess($this->chatprefix . '$<$f00Red$> Team now has $<$ff0' . $text[2] . '$> points!');
-			} elseif (is_numeric($text[1])) { //TODO: add support of name of teams (need update from NADEO)
-				$this->maniaControl->getModeScriptEventManager()->setTrackmaniaTeamPoints($text[1], "", $text[2]	, $text[2]);
-				$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Team ' . $text[1] . ' now has $<$ff0' . $text[2] . '$> points!');
-			} else {
-				$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-				$stmt = $mysqli->prepare('SELECT login FROM `' . PlayerManager::TABLE_PLAYERS . '` WHERE nickname LIKE ?');
-				$stmt->bind_param('s', $text[1]);
+		if (count($text) < 3) {
+			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Missing parameters. Eg: //matchsetpoints <Team Name or id / Player Name or Login> <Match points> <Map Points (optional)> <Round Points (optional)>', $adminplayer);
+			return;
+		}
 
-				if (!$stmt->execute()) {
-					Logger::logError('Error executing MySQL query: '. $stmt->error);
-				}
+		$target = $text[1];
+		$matchpoints = $text[2];
+		$mappoints = '';
+		$roundpoints = '';
 
-				$result = $stmt->get_result();
-				$array = mysqli_fetch_array($result);
-
-				if (isset($array[0])) {
-						$login = $array[0];
-				} elseif (strlen($text[1]) == 22) {
-						$login = $text[1];
-				}
-				if ($mysqli->error) {
-						trigger_error($mysqli->error, E_USER_ERROR);
-				}
-
-				if (isset($login)) {
-					$player = $this->maniaControl->getPlayerManager()->getPlayer($login,true);
-					if ($player) {
-						$this->maniaControl->getModeScriptEventManager()->setTrackmaniaPlayerPoints($player, "", "", $text[2]);
-						$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> now has $<$ff0' . $text[2] . '$> points!');
-					} else {
-						$this->maniaControl->getChat()->sendError($this->chatprefix . 'Player ' . $text[1] . " isn't connected", $adminplayer);
-					}
-				} else {
-					$this->maniaControl->getChat()->sendError($this->chatprefix . 'Player ' . $text[1] . " doesn't exist", $adminplayer);
-				}
+		if (!is_numeric($matchpoints)) {
+			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Invalid argument: Match points', $adminplayer);
+			return;
+		}
+		
+		if (isset($text[3])) {
+			$mappoints = $text[3];
+			if (!is_numeric($mappoints)) {
+				$this->maniaControl->getChat()->sendError($this->chatprefix . 'Invalid argument: Map points', $adminplayer);
+				return;
 			}
+		}
+
+		if (isset($text[4])) {
+			$roundpoints = $text[4];
+			if (!is_numeric($roundpoints)) {
+				$this->maniaControl->getChat()->sendError($this->chatprefix . 'Invalid argument: Round points', $adminplayer);
+				return;
+			}
+		}
+
+		if (strcasecmp($target, "Blue") == 0 || $target == "0") { 
+			$this->maniaControl->getModeScriptEventManager()->setTrackmaniaTeamPoints("0", $roundpoints, $mappoints, $matchpoints);
+			$this->maniaControl->getChat()->sendSuccess($this->chatprefix . '$<$00fBlue$> Team now has $<$ff0' . $matchpoints . '$> points!');
+		} elseif (strcasecmp($target, "Red") == 0 || $target == "1") {
+			$this->maniaControl->getModeScriptEventManager()->setTrackmaniaTeamPoints("1", $roundpoints, $mappoints, $matchpoints);
+			$this->maniaControl->getChat()->sendSuccess($this->chatprefix . '$<$f00Red$> Team now has $<$ff0' . $matchpoints . '$> points!');
+		} elseif (is_numeric($target)) { //TODO: add support of name of teams (need update from NADEO)
+			$this->maniaControl->getModeScriptEventManager()->setTrackmaniaTeamPoints($target, $roundpoints, $mappoints, $matchpoints);
+			$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Team ' . $target . ' now has $<$ff0' . $matchpoints . '$> points!');
 		} else {
-			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Missing or invalid parameters', $adminplayer);
+			$mysqli = $this->maniaControl->getDatabase()->getMysqli();
+			$stmt = $mysqli->prepare('SELECT login FROM `' . PlayerManager::TABLE_PLAYERS . '` WHERE nickname LIKE ?');
+			$stmt->bind_param('s', $target);
+
+			if (!$stmt->execute()) {
+				Logger::logError('Error executing MySQL query: '. $stmt->error);
+			}
+
+			$result = $stmt->get_result();
+			$array = mysqli_fetch_array($result);
+
+			if (isset($array[0])) {
+					$login = $array[0];
+			} elseif (strlen($target) == 22) {
+					$login = $target;
+			}
+			if ($mysqli->error) {
+					trigger_error($mysqli->error, E_USER_ERROR);
+			}
+
+			if (isset($login)) {
+				$player = $this->maniaControl->getPlayerManager()->getPlayer($login,true);
+				if ($player) {
+					$this->maniaControl->getModeScriptEventManager()->setTrackmaniaPlayerPoints($player, "", "", $matchpoints);
+					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> now has $<$ff0' . $matchpoints . '$> points!');
+				} else {
+					$this->maniaControl->getChat()->sendError($this->chatprefix . 'Player ' . $target . " isn't connected", $adminplayer);
+				}
+			} else {
+				$this->maniaControl->getChat()->sendError($this->chatprefix . 'Player ' . $target . " doesn't exist", $adminplayer);
+			}
 		}
 	}
 }
