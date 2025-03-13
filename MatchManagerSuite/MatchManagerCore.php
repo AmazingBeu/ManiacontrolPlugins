@@ -670,7 +670,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 *
 	 * @param Setting $setting
 	*/
-	public function updateSettings(Setting $setting = null) {
+	public function updateSettings(?Setting $setting = null) {
 		if (isset($setting) && $setting->belongsToClass($this) && $this->matchStarted) {
 			if ($setting->setting == self::SETTING_MATCH_GAMEMODE_BASE && $setting->value != $this->currentgmbase) {
 				$setting->value = $this->currentgmbase; 
