@@ -357,8 +357,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	private $pausetimer				= 0;
 	private $pauseon				= false;
 
-	private $skipround				= false;
-
 	private $settingsloaded			= false;
 	private $postmatch				= false;
 	private $mapsshuffled			= false;
@@ -1498,7 +1496,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			Logger::log("End Pause");
 			$this->closePauseWidget();
 			$this->pauseon = false;
-			$this->skipround = true;
 			$this->maniaControl->getModeScriptEventManager()->endPause();
 		}
 	}
@@ -1969,7 +1966,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$this->maniaControl->getAuthenticationManager()->sendNotAllowed($player);
 			return;
 		}
-		$this->skipround = true;
 		$this->maniaControl->getModeScriptEventManager()->forceTrackmaniaRoundEnd();
 	}
 
