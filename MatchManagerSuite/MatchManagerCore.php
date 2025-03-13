@@ -36,7 +36,9 @@ use ManiaControl\Callbacks\TimerListener; // for pause
  * @license		http://www.gnu.org/licenses/ GNU General Public License, Version 3
  */
 class MatchManagerCore implements CallbackListener, CommandListener, TimerListener, CommunicationListener, Plugin {
-
+	/*
+	 * MARK: Constants
+	 */
 	const PLUGIN_ID											= 152;
 	const PLUGIN_VERSION									= 5.6;
 	const PLUGIN_NAME										= 'MatchManager Core';
@@ -326,7 +328,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	];
 
 	/*
-	 * Private properties
+	 * MARK: Private properties
 	 */
 	private $matchStarted			= false;
 	/** @var ManiaControl $maniaControl */
@@ -367,6 +369,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 	private $matchid				= "";
 
+	/*
+	 * MARK: Functions
+	 */
 	/**
 	 * @param ManiaControl $maniaControl
 	 * @see \ManiaControl\Plugins\Plugin::prepare()
@@ -601,6 +606,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		}
 	}
 
+	/*
+	 * MARK: Informational Functions
+	 */
 	public function getMatchStatus() {
 		return $this->matchStarted;
 	}
@@ -652,6 +660,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	public function getPauseStatus() {
 		return $this->pauseon;
 	}
+
+	/*
+	 * MARK: Internal Functions
+	 */
 
 	/**
 	 * Update Widgets on Setting Changes
@@ -1346,6 +1358,111 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	}
 
 	/**
+	 * Compute Current Scores properties
+	 * 
+	 * @param OnScoresStructure $structure 
+	 * @return void 
+	 */
+	private function computeCurrentScores(OnScoresStructure $structure) {
+		//
+		// Players Scores
+		//
+		$this->currentscore = array();
+		$results = $structure->getPlayerScores();
+
+		if  ($this->currentgmbase == "RoyalTimeAttack") {
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
+			Logger::Log("No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
+		}
+
+		$preendroundplayersscore = [];
+		$preendroundteamsscore = [];
+		if ($this->preendroundscore !== null) {
+			$preendroundplayersscore = $this->preendroundscore->getPlayerScores();
+			$preendroundteamsscore = $this->preendroundscore->getTeamScores();
+		}
+		$this->preendroundscore = null;
+
+		foreach ($results as $result) {
+			/** @var \ManiaControl\Callbacks\Structures\TrackMania\Models\PlayerScore $result */
+			$rank 					= $result->getRank();
+			$player					= $result->getPlayer();
+			$matchpoints			= $result->getMatchPoints();
+			$mappoints				= $result->getMapPoints();
+			$roundpoints			= $result->getRoundPoints();
+			$bestracetime			= $result->getBestRaceTime();
+			$bestracecheckpoints	= implode(",", $result->getBestRaceCheckpoints());
+			$bestlaptime			= $result->getBestLapTime();
+			$bestlapcheckpoints		= implode(",", $result->getBestLapCheckpoints());
+			$prevracetime			= $result->getPrevRaceTime();
+			$prevracecheckpoints	= implode(",", $result->getPrevRaceCheckpoints());
+
+			if (count($preendroundplayersscore) > 0) {
+				$preendroundarray = array_filter($preendroundplayersscore, function ($e) use ($player) { return $e->getPlayer() === $player ; });
+
+				foreach ($preendroundarray as $key => $preendround) {
+					if ($roundpoints == 0 && $preendround->getRoundPoints() != 0) {
+						$roundpoints = $preendround->getRoundPoints();
+					}
+					if ($mappoints == 0 && $preendround->getMapPoints() != 0) {
+						$mappoints = $preendround->getMapPoints();
+					}
+					unset($preendroundplayersscore[$key]);
+					break;
+				}
+			}
+
+			$this->currentscore = array_merge($this->currentscore, array(
+				array($rank, $player->login, $matchpoints, $mappoints, $roundpoints, $bestracetime, $bestracecheckpoints, $bestlaptime, $bestlapcheckpoints, $prevracetime, $prevracecheckpoints, $player->teamId)
+			));
+		}
+
+		//
+		// Teams Scores
+		//
+		$this->currentteamsscore = array();
+		$teamresults = $structure->getTeamScores();
+
+		if (count($teamresults) > 1) {
+			// Resort scores
+			usort($teamresults, function ($a, $b) { return -($a->getMatchPoints() <=> $b->getMatchPoints()); });
+
+			$rank = 1;
+			foreach ($teamresults as $teamresult) {
+				$teamid					= $teamresult->getTeamId();
+				$teamname				= $teamresult->getName();
+				$matchpoints			= $teamresult->getMatchPoints();
+				$mappoints				= $teamresult->getMapPoints();
+				$roundpoints			= $teamresult->getRoundPoints();
+
+				if (count($preendroundteamsscore) > 0) {
+					$preendroundarray = array_filter($preendroundteamsscore, function ($e) use ($teamid) { return $e->getTeamId() === $teamid ; });
+
+					foreach ($preendroundarray as $key => $preendround) {
+						if ($roundpoints == 0 && $preendround->getRoundPoints() != 0) {
+							$roundpoints = $preendround->getRoundPoints();
+						}
+						if ($mappoints == 0 && $preendround->getMapPoints() != 0) {
+							$mappoints = $preendround->getMapPoints();
+						}
+						unset($preendroundteamsscore[$key]);
+						break;
+					}
+				}
+
+				$this->currentteamsscore = array_merge($this->currentteamsscore, array(
+					array($rank, $teamid, $teamname, $matchpoints, $mappoints, $roundpoints)
+				));
+				$rank++;
+			}
+		}
+	}
+
+	/*
+	 * MARK: Pause Management
+	 */
+
+	/**
 	 * Set pause
 	 * 
 	 * @param boolean $admin 
@@ -1441,6 +1558,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	public function closePauseWidget($login = null) {
 		$this->maniaControl->getManialinkManager()->hideManialink(self::MLID_MATCH_PAUSE_WIDGET, $login);
 	}
+
+	/*
+	 * MARK: On Game Callbacks
+	 */
 
 	/**
 	 * Handle when a player connect
@@ -1757,100 +1878,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		}
 	}
 
-	private function computeCurrentScores(OnScoresStructure $structure) {
-		//
-		// Players Scores
-		//
-		$this->currentscore = array();
-		$results = $structure->getPlayerScores();
-
-		if  ($this->currentgmbase == "RoyalTimeAttack") {
-			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
-			Logger::Log("No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
-		}
-
-		$preendroundplayersscore = [];
-		$preendroundteamsscore = [];
-		if ($this->preendroundscore !== null) {
-			$preendroundplayersscore = $this->preendroundscore->getPlayerScores();
-			$preendroundteamsscore = $this->preendroundscore->getTeamScores();
-		}
-		$this->preendroundscore = null;
-
-		foreach ($results as $result) {
-			/** @var \ManiaControl\Callbacks\Structures\TrackMania\Models\PlayerScore $result */
-			$rank 					= $result->getRank();
-			$player					= $result->getPlayer();
-			$matchpoints			= $result->getMatchPoints();
-			$mappoints				= $result->getMapPoints();
-			$roundpoints			= $result->getRoundPoints();
-			$bestracetime			= $result->getBestRaceTime();
-			$bestracecheckpoints	= implode(",", $result->getBestRaceCheckpoints());
-			$bestlaptime			= $result->getBestLapTime();
-			$bestlapcheckpoints		= implode(",", $result->getBestLapCheckpoints());
-			$prevracetime			= $result->getPrevRaceTime();
-			$prevracecheckpoints	= implode(",", $result->getPrevRaceCheckpoints());
-
-			if (count($preendroundplayersscore) > 0) {
-				$preendroundarray = array_filter($preendroundplayersscore, function ($e) use ($player) { return $e->getPlayer() === $player ; });
-
-				foreach ($preendroundarray as $key => $preendround) {
-					if ($roundpoints == 0 && $preendround->getRoundPoints() != 0) {
-						$roundpoints = $preendround->getRoundPoints();
-					}
-					if ($mappoints == 0 && $preendround->getMapPoints() != 0) {
-						$mappoints = $preendround->getMapPoints();
-					}
-					unset($preendroundplayersscore[$key]);
-					break;
-				}
-			}
-
-			$this->currentscore = array_merge($this->currentscore, array(
-				array($rank, $player->login, $matchpoints, $mappoints, $roundpoints, $bestracetime, $bestracecheckpoints, $bestlaptime, $bestlapcheckpoints, $prevracetime, $prevracecheckpoints, $player->teamId)
-			));
-		}
-
-		//
-		// Teams Scores
-		//
-		$this->currentteamsscore = array();
-		$teamresults = $structure->getTeamScores();
-
-		if (count($teamresults) > 1) {
-			// Resort scores
-			usort($teamresults, function ($a, $b) { return -($a->getMatchPoints() <=> $b->getMatchPoints()); });
-
-			$rank = 1;
-			foreach ($teamresults as $teamresult) {
-				$teamid					= $teamresult->getTeamId();
-				$teamname				= $teamresult->getName();
-				$matchpoints			= $teamresult->getMatchPoints();
-				$mappoints				= $teamresult->getMapPoints();
-				$roundpoints			= $teamresult->getRoundPoints();
-
-				if (count($preendroundteamsscore) > 0) {
-					$preendroundarray = array_filter($preendroundteamsscore, function ($e) use ($teamid) { return $e->getTeamId() === $teamid ; });
-
-					foreach ($preendroundarray as $key => $preendround) {
-						if ($roundpoints == 0 && $preendround->getRoundPoints() != 0) {
-							$roundpoints = $preendround->getRoundPoints();
-						}
-						if ($mappoints == 0 && $preendround->getMapPoints() != 0) {
-							$mappoints = $preendround->getMapPoints();
-						}
-						unset($preendroundteamsscore[$key]);
-						break;
-					}
-				}
-
-				$this->currentteamsscore = array_merge($this->currentteamsscore, array(
-					array($rank, $teamid, $teamname, $matchpoints, $mappoints, $roundpoints)
-				));
-				$rank++;
-			}
-		}
-	}
+	/*
+	 * MARK: On Command Callbacks
+	 */
 
 	/**
 	 * Command //matchstart for admins
