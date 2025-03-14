@@ -659,6 +659,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		return $this->pauseon;
 	}
 
+	public function getChatPrefix() {
+		return $this->chatprefix;
+	}
+
 	/*
 	 * MARK: Internal Functions
 	 */
