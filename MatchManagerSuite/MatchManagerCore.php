@@ -10,6 +10,7 @@ use ManiaControl\Admin\AuthenticationManager;
 use ManiaControl\Callbacks\CallbackListener;
 use ManiaControl\Callbacks\Callbacks;
 use ManiaControl\Callbacks\CallbackManager;
+use ManiaControl\Callbacks\Listening;
 use ManiaControl\Callbacks\Structures\Common\StatusCallbackStructure;
 use ManiaControl\Callbacks\Structures\ManiaPlanet\StartEndStructure;
 use ManiaControl\Callbacks\Structures\TrackMania\OnPointsRepartitionStructure;
@@ -342,6 +343,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	private $currentmap				= null;
 	private $matchrecover			= false;
 	private $pointstorecover		= array();
+
+	/** @var Listening[] $canStartCallbacks */
+	private $canStartCallbacks		= array();
 
 	// Settings to keep in memory
 	private $settings_nbroundsbymap	= 5;
@@ -951,14 +955,60 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		return $array;
 	}
 
+	/*
+	 * MARK: Can Start Functions
+	 */
+	/**
+	 * Add Can Start Function (for other plugins)
+	 * @param CallbackListener $listener 
+	 * @param string $method 
+	 */
+	public function addCanStartFunction(CallbackListener $listener, string $method) {
+		if (!Listening::checkValidCallback($listener, $method))	return;
+
+		if (!array_key_exists($listener::class . "::" . $method, $this->canStartCallbacks)) {
+			$this->canStartCallbacks[] = new Listening($listener, $method);
+		}
+	}
+
+	/**
+	 * Remove Can Start Function (for other plugins)
+	 * @param CallbackListener $listener 
+	 * @param string $method 
+	 */
+	public function removeCanStartFunction(CallbackListener $listener, string $method) {
+		$name = $listener::class . "::" . $method;
+		if (array_key_exists($name, $this->canStartCallbacks)) {
+			$this->canStartCallbacks = array_diff_key($this->canStartCallbacks, [$name]);
+		}
+	}
+
+	/**
+	 * Match can start or not
+	 * @return bool 
+	 */
+	private function canStartMatch() {
+		if ($this->matchStarted) {
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " a match is already launched");
+			return false;
+		}
+
+		foreach ($this->canStartCallbacks as $listening) {
+			if (!$listening->triggerCallbackWithParams([])) return false;
+		}
+
+		return true;
+	}
+
+	/*
+	 * MARK: Start / Stop / End functions
+	 */
 	/**
 	 * Function called to start the match
 	 */
 	public function MatchStart() {
-		if ($this->matchStarted) {
-			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " a match is already launched");
-			return;
-		}
+		if (!$this->canStartMatch()) return;
+
 		try {
 			$this->matchid = $this->maniaControl->getServer()->login . "-" . time();
 			$this->currentgmbase = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE);
@@ -992,7 +1042,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					shuffle($maps);
 				}
 
-				//Remove all maps
+				// Remove all maps
 				foreach ($this->maniaControl->getMapManager()->getMaps() as $map) {
 					$this->maniaControl->getClient()->removeMap($map->fileName);
 				}
