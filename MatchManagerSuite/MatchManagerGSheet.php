@@ -307,7 +307,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			}
 			if (isset($data->device_code)) {
 				$this->device_code = $data->device_code;
-				$this->maniaControl->getChat()->sendSuccess('Open $<$l['. $data->verification_url . ']this link$> and type this code: "' . $data->user_code .'"' , $player);
+				$this->maniaControl->getChat()->sendSuccess('Open $<$l['. $data->verification_url .'?user_code=' . $data->user_code . ']this link$> and type this code: "' . $data->user_code .'"' , $player);
 				$this->maniaControl->getChat()->sendSuccess('After have validate the App, type the commande "//matchgsheet step2"' , $player);
 			} elseif (isset($data->error_code)) {
 				$this->maniaControl->getChat()->sendError('Google refused the request: ' . $data->error_code, $player);
