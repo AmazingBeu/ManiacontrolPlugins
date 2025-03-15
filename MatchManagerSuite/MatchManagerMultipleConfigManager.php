@@ -513,7 +513,6 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 * @param Player $player
 	 */
 	public function showSaveConfigUI(Player $player) {
-		Logger::log("showConfigListUI");
 		$width  = $this->maniaControl->getManialinkManager()->getStyleManager()->getListWidgetsWidth();
 		$height = $this->maniaControl->getManialinkManager()->getStyleManager()->getListWidgetsHeight();
 
