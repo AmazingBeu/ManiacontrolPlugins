@@ -38,7 +38,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 * Constants
 	 */
 	const PLUGIN_ID											= 153;
-	const PLUGIN_VERSION									= 1.7;
+	const PLUGIN_VERSION									= 1.8;
 	const PLUGIN_NAME										= 'MatchManager Widget';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -66,8 +66,8 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	private $maniaControl 			= null;
 	private $MatchManagerCore		= null;
 	private $gmbase					= "";
-	private $manialinkData			= "";
-	private $manialinkBackground	= "";
+	private $manialinkData			= null;
+	private $manialinkBackground	= null;
 	private $playerswithML			= [];
 	private $specswithML			= [];
 
@@ -519,7 +519,6 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 			$rankLabel->setTextPrefix('$o');
 			$rankLabel->setText($rank);
 			$rankLabel->setTextEmboss(true);
-			$rankLabel->setZ(1);
 
 			//Name
 			$nameLabel = new Label();
@@ -529,7 +528,6 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 			$nameLabel->setSize($width * 0.6, 4);
 			$nameLabel->setTextSize(1);
 			$nameLabel->setTextEmboss(true);
-			$nameLabel->setZ(1);
 
 			//Points
 			$pointsLabel = new Label();
@@ -540,14 +538,13 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 			$pointsLabel->setTextSize(1);
 			$pointsLabel->setText('$z' . $points);
 			$pointsLabel->setTextEmboss(true);
-			$pointsLabel->setZ(1);
 
 			//Background with Spec action
 			$quad = new Quad();
 			$recordFrame->addChild($quad);
 			$quad->setStyles(Quad_Bgs1InRace::STYLE, Quad_Bgs1InRace::SUBSTYLE_BgCardList);
 			$quad->setSize($width-2, 4);
-			$quad->setZ(1);
+			$quad->setZ(-1);
 
 			if ($this->gmbase == "Teams") {
 				$team = $this->maniaControl->getClient()->getTeamInfo($score[1] + 1);
