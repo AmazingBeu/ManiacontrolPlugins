@@ -300,6 +300,11 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				$this->maniaControl->getChat()->sendError('Json parse error: ' . $json, $player);
 				return;
 			}
+			if (property_exists($data, "error")) {
+				Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
+				$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+				return;
+			}
 			if (isset($data->device_code)) {
 				$this->device_code = $data->device_code;
 				$this->maniaControl->getChat()->sendSuccess('Open $<$l['. $data->verification_url . ']this link$> and type this code: "' . $data->user_code .'"' , $player);
@@ -350,6 +355,12 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				$this->maniaControl->getChat()->sendError('Json parse error: ' . $json, $player);
 				return;
 			}
+			if (property_exists($data, "error")) {
+				Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
+				$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+				return;
+			}
+			
 			if (isset($data->access_token)) {
 				$this->access_token = $data->access_token;
 				$this->saveSecretSetting("access_token", $data->access_token);
@@ -391,6 +402,12 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					Logger::logError('Json parse error: ' . $json);
 					return;
 				}
+				if (property_exists($data, "error")) {
+					Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+					return;
+				}
+
 				if (isset($data->access_token)) {
 					$this->access_token = $data->access_token;
 					$this->saveSecretSetting("access_token", $data->access_token);
@@ -461,6 +478,12 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					$this->maniaControl->getChat()->sendError('Json parse error: ' . $json, $player);
 					return;
 				}
+				if (property_exists($data, "error")) {
+					Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+					return;
+				}
+
 				if (isset($data->properties->title)) {
 					$this->maniaControl->getChat()->sendSuccess('Speadsheet name: ' . $data->properties->title, $player);
 				} else {
@@ -546,6 +569,11 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
 					return;
 				}
+				if (property_exists($data, "error")) {
+					Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+					return;
+				}
 
 				if ($this->currentdatamode == "All Rounds Data" && $matchstatus == "running") {
 					$newcurrentscore = [];
@@ -574,6 +602,11 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 							$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
 							return;
 						}
+						if (property_exists($data, "error")) {
+							Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
+							$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+							return;
+						}
 
 						if (!empty($currentteamsscore)) {
 							$newcurrentteamsscore = [];
@@ -600,6 +633,11 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 								if (!$data) {
 									Logger::logError('Json parse error: ' . $json);
 									$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+									return;
+								}
+								if (property_exists($data, "error")) {
+									Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
+									$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
 									return;
 								}
 							});
@@ -653,6 +691,11 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				if (!$data) {
 					Logger::logError('Json parse error: ' . $json);
 					$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+					return;
+				}
+				if (property_exists($data, "error")) {
+					Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
 					return;
 				}
 
@@ -798,6 +841,12 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
 					return;
 				}
+				if (property_exists($data, "error")) {
+					Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+					return;
+				}
+
 				// Clear Scoreboards data
 				$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $spreadsheetid . '/values/' . urlencode("'". $sheetname . "'") . '!A1:Z300:clear');
 				$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
@@ -813,6 +862,12 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 						$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
 						return;
 					}
+					if (property_exists($data, "error")) {
+						Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
+						$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+						return;
+					}
+
 					// Add headers data
 					$data = new \stdClass;
 					$data->valueInputOption = "RAW";
@@ -843,6 +898,11 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 						if (!$data) {
 							Logger::logError('Json parse error: ' . $json);
 							$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+							return;
+						}
+						if (property_exists($data, "error")) {
+							Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
+							$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
 							return;
 						}
 					});
