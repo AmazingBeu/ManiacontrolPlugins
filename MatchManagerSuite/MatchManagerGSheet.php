@@ -94,9 +94,9 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 */
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl 			= null;
+	/** @var MatchManagerCore */
 	private $MatchManagerCore		= null;
 	private $matchstatus			= "";
-	private $chatprefix				= '$<$fc3$w🏆$m$> '; // Would like to create a setting but MC database doesn't support utf8mb4
 	private $device_code			= "";
 	private $access_token			= "";
 	private $matchid				= "";
@@ -246,7 +246,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			if (($this->matchstatus == "running" || $this->matchstatus == "starting") && $setting->setting == self::SETTING_MATCHMANAGERGSHEET_DATA_MODE && $setting->value != $this->currentdatamode) {
 				$setting->value = $this->currentdatamode; 
 				$this->maniaControl->getSettingManager()->saveSetting($setting);
-				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'You can\'t change data mode during a Match');
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() . 'You can\'t change data mode during a Match');
 			}
 		}
 	}
