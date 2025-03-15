@@ -23,7 +23,7 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 	 * Constants
 	 */
 	const PLUGIN_ID			= 154;
-	const PLUGIN_VERSION	= 2.2;
+	const PLUGIN_VERSION	= 2.3;
 	const PLUGIN_NAME		= 'Guestlist Manager';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -556,9 +556,10 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 		if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ADD_ADMINS)) return;
 
 		$guestlist = $this->maniaControl->getClient()->getGuestList();
+		$authLevel = $this->maniaControl->getAuthenticationManager()->getAuthLevelInt($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ADMIN_LEVEL));
+		$admins = $this->maniaControl->getAuthenticationManager()->getAdmins($authLevel);
 
-		foreach ($this->maniaControl->getAuthenticationManager()->getAdmins() as $admin) {
-			if ($this->maniaControl->getAuthenticationManager()->checkRight($admin, $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ADMIN_LEVEL))) continue;
+		foreach ($admins as $admin) {
 			$this->addLoginToGL($admin->login, $guestlist);
 		}
 	}
@@ -574,7 +575,8 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 		$guestlist = $this->maniaControl->getClient()->getGuestList();
 
 		$isGuestlisted = in_array($player->login, array_column($guestlist, 'login'));
-		$isAdmin = $this->maniaControl->getAuthenticationManager()->checkRight($player,$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ADMIN_LEVEL));
+		$authLevel = $this->maniaControl->getAuthenticationManager()->getAuthLevelInt($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ADMIN_LEVEL));
+		$isAdmin = $this->maniaControl->getAuthenticationManager()->checkRight($player, $authLevel);
 
 		if (!$isGuestlisted && $isAdmin) {
 			$this->addLoginToGL($player->login, $guestlist);
