@@ -17,12 +17,14 @@ use ManiaControl\Manialinks\ManialinkPageAnswerListener;
 
 use ManiaControl\Callbacks\CallbackListener;
 use ManiaControl\Callbacks\CallbackManager;
+use ManiaControl\Callbacks\Callbacks;
 use ManiaControl\Logger;
 use ManiaControl\ManiaControl;
 use ManiaControl\Players\Player;
 use ManiaControl\Plugins\Plugin;
 use ManiaControl\Plugins\PluginManager;
 use ManiaControl\Commands\CommandListener;
+use ManiaControl\Plugins\PluginMenu;
 
 if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
 	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
@@ -48,15 +50,17 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 
 	// MatchManagerWidget Properties
 	const MATCHMANAGERCORE_PLUGIN							= 'MatchManagerSuite\MatchManagerCore';
+	const MATCHMANAGERADMINUI_PLUGIN						= 'MatchManagerSuite\MatchManagerAdminUI';
 
 	const DB_MATCHCONFIG									= 'MatchManager_MatchConfigs';
 
 	const ML_ID												= 'MatchManager.MultiConfigManager.UI';
-	const ML_ACTION_REMOVE_CONFIG							= 'MatchManager.MultiConfigManager.RemoveConfig';
-	const ML_ACTION_LOAD_CONFIG								= 'MatchManager.MultiConfigManager.LoadConfig';
-	const ML_ACTION_LOAD_CONFIG_PAGE						= 'MatchManager.MultiConfigManager.LoadConfigPage';
-	const ML_ACTION_SAVE_CONFIG								= 'MatchManager.MultiConfigManager.SaveConfig';
-	const ML_ACTION_SAVE_CONFIG_PAGE						= 'MatchManager.MultiConfigManager.SaveConfigPage';
+	const ML_ACTION_OPENSETTINGS							= 'MatchManagerSuite\MatchManagerMultipleConfigManager.OpenSettings';
+	const ML_ACTION_REMOVE_CONFIG							= 'MatchManagerSuite\MatchManagerMultipleConfigManager.RemoveConfig';
+	const ML_ACTION_LOAD_CONFIG								= 'MatchManagerSuite\MatchManagerMultipleConfigManager.LoadConfig';
+	const ML_ACTION_LOAD_CONFIG_PAGE						= 'MatchManagerSuite\MatchManagerMultipleConfigManager.LoadConfigPage';
+	const ML_ACTION_SAVE_CONFIG								= 'MatchManagerSuite\MatchManagerMultipleConfigManager.SaveConfig';
+	const ML_ACTION_SAVE_CONFIG_PAGE						= 'MatchManagerSuite\MatchManagerMultipleConfigManager.SaveConfigPage';
 	const ML_NAME_CONFIGNAME								= 'MatchManager.MultiConfigManager.ConfigName';
 
 	const CB_LOADCONFIG										= 'MatchManager.MultiConfigManager.LoadConfig';
@@ -125,13 +129,15 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 			throw new \Exception('MatchManager Core is needed to use MatchManager Players Pause plugin');
 		}
 
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::AFTERINIT, $this, 'handleAfterInit');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_LOADED, $this, 'handlePluginLoaded');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_UNLOADED, $this, 'handlePluginUnloaded');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(CallbackManager::CB_MP_PLAYERMANIALINKPAGEANSWER, $this, 'handleManialinkPageAnswer');
 
 		$this->maniaControl->getCommandManager()->registerCommandListener('matchconfig', $this, 'showConfigListUI', true, 'Start a match');
 
-
 		$this->initTables();
+		$this->updateAdminUIMenuItems();
 		return true;
 	}
 
@@ -139,6 +145,31 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 * @see \ManiaControl\Plugins\Plugin::unload()
 	 */
 	public function unload() {
+		/** @var \MatchManagerSuite\MatchManagerAdminUI|null */
+		$adminUIPlugin = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERADMINUI_PLUGIN);
+		if ($adminUIPlugin !== null) {
+			$adminUIPlugin->removeMenuItem(self::ML_ACTION_OPENSETTINGS);
+		}
+	}
+
+	/**
+	 * handle Plugin Loaded
+	 * 
+	 * @param string $pluginClass 
+	 */
+	public function handleAfterInit() {
+		$this->updateAdminUIMenuItems();
+	}
+
+	/**
+	 * handle Plugin Loaded
+	 * 
+	 * @param string $pluginClass 
+	 */
+	public function handlePluginLoaded(string $pluginClass) {
+		if ($pluginClass === self::MATCHMANAGERADMINUI_PLUGIN) {
+			$this->updateAdminUIMenuItems();
+		}
 	}
 
 	/**
@@ -175,16 +206,31 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	}
 
 	/**
+	 * Add items in AdminUI plugin
+	 */
+	public function updateAdminUIMenuItems() {
+		/** @var \MatchManagerSuite\MatchManagerAdminUI|null */
+		$adminUIPlugin = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERADMINUI_PLUGIN);
+		if ($adminUIPlugin === null) return;
+
+		$adminUIPlugin->removeMenuItem(self::ML_ACTION_OPENSETTINGS);
+
+		$menuItem = new \MatchManagerSuite\MatchManagerAdminUI_MenuItem();
+		$menuItem->setActionId(self::ML_ACTION_OPENSETTINGS)->setOrder(200)->setStyle('UICommon64_2')->setSubStyle('Plugin_light')->setDescription('Manage Multiple Configs');
+		$adminUIPlugin->addMenuItem($menuItem);
+	}
+
+	/**
 	 * handleManialinkPageAnswer
 	 *
 	 * @param  array $callback
 	 * @return void
 	 */
 	public function handleManialinkPageAnswer(array $callback) {
-		Logger::log("handleManialinkPageAnswer");
 		$actionId    = $callback[1][2];
 		$actionArray = explode('.', $actionId);
-		if ($actionArray[0] != "MatchManager" || $actionArray[1] != "MultiConfigManager") {
+
+		if ($actionArray[0] !== self::class) {
 			return;
 		}
 
@@ -194,9 +240,10 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 			return;
 		}
 
-		$action = $actionArray[0] . '.' . $actionArray[1] . '.' . $actionArray[2];
-
-		switch ($action) {
+		switch ($actionId) {
+			case self::ML_ACTION_OPENSETTINGS:
+				$this->showConfigListUI(array(), $player);
+				break;
 			case self::ML_ACTION_REMOVE_CONFIG:
 				$id = intval($actionArray[3]);
 				Logger::log("[MatchManagerMultipleConfigManager] Removing config: " . $id);

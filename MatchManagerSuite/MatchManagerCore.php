@@ -29,6 +29,8 @@ use ManiaControl\Configurator\GameModeSettings;
 use ManiaControl\Utils\Formatter;
 use Maniaplanet\DedicatedServer\InvalidArgumentException;
 use ManiaControl\Callbacks\TimerListener; // for pause
+use ManiaControl\Plugins\PluginManager;
+use ManiaControl\Plugins\PluginMenu;
 
 /**
  * MatchManager Core
@@ -53,6 +55,16 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	const DB_MATCHESRESULT									= 'MatchManager_MatchesResult';
 	const DB_MATCHESTEAMSRESULT								= 'MatchManager_MatchesTeamsResult';
 	const MLID_MATCH_PAUSE_WIDGET							= 'Pause Widget';
+
+	// Other MatchManager plugin
+	const MATCHMANAGERADMINUI_PLUGIN							= 'MatchManagerSuite\MatchManagerAdminUI';
+
+	// Actions
+	const ML_ACTION_OPENSETTINGS						= 'MatchManagerSuite\MatchManagerCore.OpenSettings';
+	const ML_ACTION_SKIPROUND 							= 'MatchManagerSuite\MatchManagerCore.SkipRound';
+	const ML_ACTION_PAUSEMATCH 							= 'MatchManagerSuite\MatchManagerCore.PauseMatch';
+	const ML_ACTION_STOPMATCH 							= 'MatchManagerSuite\MatchManagerCore.StopMatch';
+	const ML_ACTION_STARTMATCH 							= 'MatchManagerSuite\MatchManagerCore.StartMatch';
 
 	// Internal Callback Trigger
 	const CB_MATCHMANAGER_BEGINMAP							= 'MatchManager.BeginMap';
@@ -450,8 +462,12 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->maniaControl->getCommandManager()->registerCommandListener(array('matchendpause','endpause'), $this, 'onCommandUnsetPause', true, 'End the pause during a match.');
 
 		//Register Callbacks
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::AFTERINIT, $this, 'handleAfterInit');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_LOADED, $this, 'handlePluginLoaded');
+
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(GameModeSettings::CB_GAMEMODESETTINGS_CHANGED, $this, 'updateGMvariables');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(CallbackManager::CB_MP_PLAYERMANIALINKPAGEANSWER, $this, 'handleManialinkPageAnswer');
 
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERDISCONNECT, $this, 'handlePlayerDisconnect');
@@ -467,7 +483,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.GetCurrentScore", $this, function () { return new CommunicationAnswer($this->getCurrentScore()); });
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.MatchStart", $this, function () { return new CommunicationAnswer($this->MatchStart()); });
 		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.MatchStop", $this, function () { return new CommunicationAnswer($this->MatchStop()); });
-		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.GetMatchOptions", $this, function () { return new CommunicationAnswer($this->getGMSettings($this->currentgmbase,$this->currentcustomgm)); });
+		$this->maniaControl->getCommunicationManager()->registerCommunicationListener("Match.GetMatchOptions", $this, function () { return new CommunicationAnswer($this->getGMSettings($this->currentgmbase,$this->currentcustomgm)); });	
+
+		$this->updateAdminUIMenuItems();
 	}
 
 	/**
@@ -475,6 +493,16 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 */
 	public function unload() {
 		$this->closePauseWidget();
+
+		/** @var \MatchManagerSuite\MatchManagerAdminUI|null */
+		$adminUIPlugin = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERADMINUI_PLUGIN);
+		if ($adminUIPlugin !== null) {
+			$adminUIPlugin->removeMenuItem(self::ML_ACTION_OPENSETTINGS);
+			$adminUIPlugin->removeMenuItem(self::ML_ACTION_STARTMATCH);
+			$adminUIPlugin->removeMenuItem(self::ML_ACTION_SKIPROUND);
+			$adminUIPlugin->removeMenuItem(self::ML_ACTION_PAUSEMATCH);
+			$adminUIPlugin->removeMenuItem(self::ML_ACTION_STOPMATCH);
+		}
 	}
 
 	/**
@@ -670,6 +698,43 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	/*
 	 * MARK: Internal Functions
 	 */
+
+	/**
+	 * Add items in AdminUI plugin
+	 */
+	public function updateAdminUIMenuItems() {
+		/** @var \MatchManagerSuite\MatchManagerAdminUI|null */
+		$adminUIPlugin = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERADMINUI_PLUGIN);
+		if ($adminUIPlugin === null) return;
+
+		$menuItem = new \MatchManagerSuite\MatchManagerAdminUI_MenuItem();
+		$menuItem->setActionId(self::ML_ACTION_OPENSETTINGS)->setOrder(99999)->setStyle('UICommon64_1')->setSubStyle('Settings_light')->setDescription('Open Core Settings');
+		$adminUIPlugin->addMenuItem($menuItem);
+
+		if ($this->matchStarted) {
+			$adminUIPlugin->removeMenuItem(self::ML_ACTION_STARTMATCH);
+			
+			$menuItem = new \MatchManagerSuite\MatchManagerAdminUI_MenuItem();
+			$menuItem->setActionId(self::ML_ACTION_SKIPROUND)->setOrder(0)->setStyle('UICommon64_1')->setSubStyle('Cross_light')->setDescription('Skip the round / Warmup / Pause');
+			$adminUIPlugin->addMenuItem($menuItem);
+
+			$menuItem = new \MatchManagerSuite\MatchManagerAdminUI_MenuItem();
+			$menuItem->setActionId(self::ML_ACTION_PAUSEMATCH)->setOrder(1)->setStyle('UICommon64_1')->setSubStyle('Pause_light')->setDescription('Pause the match');
+			$adminUIPlugin->addMenuItem($menuItem);
+
+			$menuItem = new \MatchManagerSuite\MatchManagerAdminUI_MenuItem();
+			$menuItem->setActionId(self::ML_ACTION_STOPMATCH)->setOrder(2)->setStyle('UICommon64_1')->setSubStyle('Stop_light')->setDescription('Stop the match');
+			$adminUIPlugin->addMenuItem($menuItem);
+		} else {
+			$adminUIPlugin->removeMenuItem(self::ML_ACTION_SKIPROUND);
+			$adminUIPlugin->removeMenuItem(self::ML_ACTION_PAUSEMATCH);
+			$adminUIPlugin->removeMenuItem(self::ML_ACTION_STOPMATCH);
+
+			$menuItem = new \MatchManagerSuite\MatchManagerAdminUI_MenuItem();
+			$menuItem->setActionId(self::ML_ACTION_STARTMATCH)->setOrder(0)->setStyle('UICommon64_1')->setSubStyle('Play_light')->setDescription('Start the match');
+			$adminUIPlugin->addMenuItem($menuItem);
+		}
+	}
 
 	/**
 	 * Update Widgets on Setting Changes
@@ -1135,6 +1200,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				'mapshidden'	=> $this->mapshidden,
 				'maps'			=> $this->maps];
 			$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_STARTMATCH, $this->matchid, $settings);
+			$this->updateAdminUIMenuItems();
 
 			Logger::log("Skip map");
 			$this->maniaControl->getMapManager()->getMapActions()->skipMap();
@@ -1230,6 +1296,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			Logger::log("Match finished");
 
 			$this->resetMatchVariables();
+			$this->updateAdminUIMenuItems();
 
 			// Teams Specifics variables
 			$this->currentteamsscore = [];
@@ -1280,6 +1347,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			}
 
 			$this->resetMatchVariables();
+			$this->updateAdminUIMenuItems();
 		} catch (Exception $e) {
 			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Can not stop match: ' . $e->getMessage());
 		}
@@ -2184,6 +2252,59 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			} else {
 				$this->maniaControl->getChat()->sendError($this->chatprefix . 'Player ' . $target . " doesn't exist", $adminplayer);
 			}
+		}
+	}
+
+	/*
+	 * MARK: Internal Callbacks
+	 */
+	public function handleAfterInit() {
+		$this->updateAdminUIMenuItems();
+	}
+
+	public function handlePluginLoaded(string $pluginClass) {
+		if ($pluginClass === self::MATCHMANAGERADMINUI_PLUGIN) {
+			$this->updateAdminUIMenuItems();
+		}
+	}
+
+	public function handleManialinkPageAnswer($callback) {
+		$actionId    = $callback[1][2];
+		$actionArray = explode('.', $actionId);
+		if ($actionArray[0] !== self::class) {
+			return;
+		}
+
+		$login = $callback[1][1];
+		$player = $this->maniaControl->getPlayerManager()->getPlayer($login);
+		$authLevel = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_AUTHLEVEL);
+		if (!$this->maniaControl->getAuthenticationManager()->checkRight($player, AuthenticationManager::getAuthLevel($authLevel))) {
+			return;
+		}
+
+		switch ($actionId) {
+			case self::ML_ACTION_OPENSETTINGS:
+				$pluginMenu = $this->maniaControl->getPluginManager()->getPluginMenu();
+				if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL")) {
+					$player->setCache($pluginMenu, PluginMenu::CACHE_SETTING_CLASS, "PluginMenu.Settings." . self::class);
+				} else {
+					$player->setCache($pluginMenu, PluginMenu::CACHE_SETTING_CLASS, self::class);
+				}
+				$this->maniaControl->getConfigurator()->showMenu($player, $pluginMenu);
+			case self::ML_ACTION_STOPMATCH:
+				$this->MatchStop();
+				break;
+			case self::ML_ACTION_PAUSEMATCH:
+				$this->setNadeoPause();
+				break;
+			case self::ML_ACTION_SKIPROUND:
+				$this->onCommandMatchEndWU(array(), $player); 
+				$this->onCommandUnsetPause(array(), $player); 
+				$this->onCommandMatchEndRound(array(), $player); 
+				break;
+			case self::ML_ACTION_STARTMATCH:
+				$this->MatchStart();
+				break;
 		}
 	}
 }

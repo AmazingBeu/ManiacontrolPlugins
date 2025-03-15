@@ -13,8 +13,11 @@ use ManiaControl\Settings\SettingManager;
 use ManiaControl\Files\AsyncHttpRequest;
 use ManiaControl\Commands\CommandListener;
 use ManiaControl\Admin\AuthenticationManager;
+use ManiaControl\Callbacks\Callbacks;
 use ManiaControl\Callbacks\TimerListener;
+use ManiaControl\Manialinks\ManialinkPageAnswerListener;
 use ManiaControl\Players\PlayerManager;
+use ManiaControl\Plugins\PluginMenu;
 use ManiaControl\Utils\WebReader;
 
 if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
@@ -31,7 +34,7 @@ use MatchManagerSuite\MatchManagerCore;
  * @author		Beu
  * @license		http://www.gnu.org/licenses/ GNU General Public License, Version 3
  */
-class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandListener, Plugin {
+class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandListener, ManialinkPageAnswerListener, Plugin {
 	/*
 	 * Constants
 	 */
@@ -39,6 +42,12 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	const PLUGIN_VERSION									= 2.1;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
+
+	// Other MatchManager plugin
+	const MATCHMANAGERADMINUI_PLUGIN							= 'MatchManagerSuite\MatchManagerAdminUI';
+
+	// Actions
+	const ML_ACTION_OPENSETTINGS 							= 'MatchManagerSuite\MatchManagerGSheet.OpenSettings';
 
 	// MatchManagerGSheet Properties
 	const DB_GSHEETSECRETSETTINGS							= 'MatchManagerGSheet_SecretSettings';
@@ -161,6 +170,11 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		}
 
 		// Callbacks
+		$this->maniaControl->getManialinkManager()->registerManialinkPageAnswerListener(self::ML_ACTION_OPENSETTINGS, $this, 'handleActionOpenSettings');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::AFTERINIT, $this, 'handleAfterInit');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_LOADED, $this, 'handlePluginLoaded');
+
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_UNLOADED, $this, 'handlePluginUnloaded');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
@@ -185,6 +199,8 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		
 		$this->maniaControl->getChat()->sendErrorToAdmins('Since MatchManagerGSheet 2.0, Player names are in the results and no more in a separated list');
 
+		$this->updateAdminUIMenuItems();
+
 		return true;
 	}
 
@@ -192,6 +208,31 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * @see \ManiaControl\Plugins\Plugin::unload()
 	 */
 	public function unload() {
+		/** @var \MatchManagerSuite\MatchManagerAdminUI|null */
+		$adminUIPlugin = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERADMINUI_PLUGIN);
+		if ($adminUIPlugin !== null) {
+			$adminUIPlugin->removeMenuItem(self::ML_ACTION_OPENSETTINGS);
+		}
+	}
+
+	/**
+	 * handle Plugin Loaded
+	 * 
+	 * @param string $pluginClass 
+	 */
+	public function handleAfterInit() {
+		$this->updateAdminUIMenuItems();
+	}
+
+	/**
+	 * handle Plugin Loaded
+	 * 
+	 * @param string $pluginClass 
+	 */
+	public function handlePluginLoaded(string $pluginClass) {
+		if ($pluginClass === self::MATCHMANAGERADMINUI_PLUGIN) {
+			$this->updateAdminUIMenuItems();
+		}
 	}
 
 	/**
@@ -255,6 +296,39 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		if ($this->maniaControl->getAuthenticationManager()->checkRight($player, AuthenticationManager::AUTH_LEVEL_ADMIN)) {
 			$this->maniaControl->getChat()->sendError('Since MatchManagerGSheet 2.0, Player names are in the results and no more in a separated list', $player->login);
 		}
+	}
+
+	/**
+	 * handle Open settings manialink action
+	 * 
+	 * @param array $callback 
+	 * @param Player $player 
+	 */
+	public function handleActionOpenSettings(array $callback, Player $player) {
+		if ($player->authLevel <= 0) return;
+
+		$pluginMenu = $this->maniaControl->getPluginManager()->getPluginMenu();
+		if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL")) {
+			$player->setCache($pluginMenu, PluginMenu::CACHE_SETTING_CLASS, "PluginMenu.Settings." . self::class);
+		} else {
+			$player->setCache($pluginMenu, PluginMenu::CACHE_SETTING_CLASS, self::class);
+		}
+		$this->maniaControl->getConfigurator()->showMenu($player, $pluginMenu);
+	}
+
+	/**
+	 * Add items in AdminUI plugin
+	 */
+	public function updateAdminUIMenuItems() {
+		/** @var \MatchManagerSuite\MatchManagerAdminUI|null */
+		$adminUIPlugin = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERADMINUI_PLUGIN);
+		if ($adminUIPlugin === null) return;
+
+		$adminUIPlugin->removeMenuItem(self::ML_ACTION_OPENSETTINGS);
+
+		$menuItem = new \MatchManagerSuite\MatchManagerAdminUI_MenuItem();
+		$menuItem->setActionId(self::ML_ACTION_OPENSETTINGS)->setOrder(100)->setStyle('UICommon64_2')->setSubStyle('DisplayIcons_light')->setDescription('Open Gsheet Settings');
+		$adminUIPlugin->addMenuItem($menuItem);
 	}
 
 	public function onCommandMatchGSheet(array $chatCallback, Player $player) {
@@ -360,7 +434,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
 				return;
 			}
-			
+
 			if (isset($data->access_token)) {
 				$this->access_token = $data->access_token;
 				$this->saveSecretSetting("access_token", $data->access_token);

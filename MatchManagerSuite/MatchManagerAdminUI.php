@@ -6,30 +6,19 @@ use FML\Controls\Frame;
 use FML\Controls\Label;
 use FML\Controls\Quad;
 use FML\ManiaLink;
-
+use ManiaControl\Admin\AuthenticationManager;
 use ManiaControl\Manialinks\ManialinkManager;
 use ManiaControl\Manialinks\ManialinkPageAnswerListener;
 
 use ManiaControl\Callbacks\CallbackListener;
-use ManiaControl\Logger;
 use ManiaControl\ManiaControl;
 use ManiaControl\Plugins\Plugin;
-use ManiaControl\Plugins\PluginManager;
-use ManiaControl\Plugins\PluginMenu;
 use ManiaControl\Settings\Setting;
 use ManiaControl\Settings\SettingManager;
 use ManiaControl\Callbacks\TimerListener;
 use ManiaControl\Callbacks\Callbacks;
-use ManiaControl\Callbacks\CallbackManager;
-
 use ManiaControl\Players\Player;
 use ManiaControl\Players\PlayerManager;
-
-if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
-	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
-	Logger::logError('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
-	return false;
-}
 
 /**
  * MatchManager Admin UI
@@ -42,38 +31,29 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	 * Constants
 	 */
 	const PLUGIN_ID											= 174;
-	const PLUGIN_VERSION									= 1.2;
+	const PLUGIN_VERSION									= 2.0;
 	const PLUGIN_NAME										= 'MatchManager Admin UI';
 	const PLUGIN_AUTHOR										= 'Beu';
 
 	const MLID_ADMINUI_SIDEMENU	 							= 'Matchmanager.AdminUI';
 
-	const ML_ACTION_CORE_MANAGESETTINGS						= 'MatchManager.AdminUI.ManageSettings';
-	const ML_ACTION_CORE_STOPMATCH							= 'MatchManager.AdminUI.StopMatch';
-	const ML_ACTION_CORE_PAUSEMATCH							= 'MatchManager.AdminUI.PauseMatch';
-	const ML_ACTION_CORE_SKIPROUND							= 'MatchManager.AdminUI.SkipRound';
-	const ML_ACTION_CORE_STARTMATCH							= 'MatchManager.AdminUI.StartMatch';
-	const ML_ACTION_MULTIPLECONFIGMANAGER_OPENCONFIGMANAGER	= 'MatchManager.AdminUI.OpenConfigManager';
-	const ML_ACTION_GSHEET_MANAGESETTINGS					= 'MatchManager.AdminUI.ManageGSheet';
-
-
 	const SETTING_POSX										= 'Position X of the plugin';
 	const SETTING_POSY										= 'Position Y of the plugin';
+	const SETTING_ADMIN_LEVEL 								= 'Minimum Admin level to see the Admin UI';
 
-	// MatchManagerWidget Properties
-	const MATCHMANAGERCORE_PLUGIN							= 'MatchManagerSuite\MatchManagerCore';
-	const MATCHMANAGERGSHEET_PLUGIN							= 'MatchManagerSuite\MatchManagerGSheet';
-	const MATCHMANAGERMULTIPLECONFIGMANAGER_PLUGIN			= 'MatchManagerSuite\MatchManagerMultipleConfigManager';
+	const ML_ITEM_SIZE 		= 6.;
 
 	/*
 	 * Private properties
 	 */
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl 			= null;
-	/** @var \MatchManagerSuite\MatchManagerCore */
-	private $MatchManagerCore 		= null;
 
 	private $manialink 				= null;
+	private $updateManialink 		= true;
+
+	/** @var MatchManagerAdminUI_MenuItem[] */
+	private $menuItems					= [];
 
 	/**
 	 * @param \ManiaControl\ManiaControl $maniaControl
@@ -125,15 +105,14 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	public function load(ManiaControl $maniaControl) {
 		// Init plugin
 		$this->maniaControl = $maniaControl;
-		if (!$this->maniaControl->getPluginManager()->getSavedPluginStatus(self::MATCHMANAGERCORE_PLUGIN)) {
-			throw new \Exception('MatchManager Core is needed to use ' . self::PLUGIN_NAME);
-		}
-
-		// All callbacks are loaded in handleAfterInit
-		$this->maniaControl->getTimerManager()->registerOneTimeListening($this, 'afterPluginInit', 1);
+		
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::AFTERLOOP, $this, 'handleAfterLoop');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
 
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_POSX, 156., "");
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_POSY, 24., "");
+		$this->maniaControl->getAuthenticationManager()->definePluginPermissionLevel($this, self::SETTING_ADMIN_LEVEL, AuthenticationManager::AUTH_LEVEL_ADMIN);
 
 		return true;
 	}
@@ -147,33 +126,14 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 
 	/**
 	 * afterPluginInit
-	 * Plugins are loaded alphabetically, so we have to we wait they are all loaded before check.
-	 * We can't use AFTER_INIT Callback to make it visible when enabled manually
-	 * 
+	 *
 	 * @return void 
 	 */
-	public function afterPluginInit() {
-		$this->MatchManagerCore = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERCORE_PLUGIN);
-		if ($this->MatchManagerCore === null) {
-			$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is needed to use ' . self::PLUGIN_NAME . ' plugin.');
-			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
-			return;
+	public function handleAfterLoop() {
+		if ($this->updateManialink) {
+			$this->updateManialink = false;
+			$this->generateManialink();
 		}
-
-		$this->generateManialink();
-		$this->displayManialink();
-
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_LOADED, $this, 'handlePluginLoaded');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_UNLOADED, $this, 'handlePluginUnloaded');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
-
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_STARTMATCHSTART, $this, 'generateManialink');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STARTMATCH, $this, 'generateManialink');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_ENDMATCH, $this, 'generateManialink');
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(MatchManagerCore::CB_MATCHMANAGER_STOPMATCH, $this, 'generateManialink');
-
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(CallbackManager::CB_MP_PLAYERMANIALINKPAGEANSWER, $this, 'handleManialinkPageAnswer');
 	}
 
 	/**
@@ -183,7 +143,7 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	 */
 	public function updateSettings(Setting $setting) {
 		if ($setting->belongsToClass($this)) {
-			$this->generateManialink();
+			$this->updateManialink = true;
 		}
 	}
 
@@ -193,8 +153,9 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	 * @param Player $player
 	 */
 	public function handlePlayerConnect(Player $player) {
-		if ($player->authLevel > 0) {
-			$this->maniaControl->getManialinkManager()->sendManialink($this->manialink,$player->login);
+		$authLevel = $this->maniaControl->getAuthenticationManager()->getAuthLevelInt($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ADMIN_LEVEL));
+		if ($this->maniaControl->getAuthenticationManager()->checkRight($player, $authLevel)) {
+			$this->maniaControl->getManialinkManager()->sendManialink($this->manialink, $player->login);
 		}
 	}
 	
@@ -204,71 +165,10 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	 * @return void
 	 */
 	private function displayManialink() {
-		$admins = $this->maniaControl->getAuthenticationManager()->getAdmins();
-		if (!empty($admins)) {
+		$authLevel = $this->maniaControl->getAuthenticationManager()->getAuthLevelInt($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ADMIN_LEVEL));
+		$admins = $this->maniaControl->getAuthenticationManager()->getAdmins($authLevel);
+		if (count($admins) > 0) {
 			$this->maniaControl->getManialinkManager()->sendManialink($this->manialink, $admins);
-		}
-	}
-
-	/**
-	 * handleManialinkPageAnswer
-	 *
-	 * @param  array $callback
-	 * @return void
-	 */
-	public function handleManialinkPageAnswer(array $callback) {
-		$actionId    = $callback[1][2];
-		$actionArray = explode('.', $actionId);
-		if ($actionArray[0] != "MatchManager" || $actionArray[1] != "AdminUI") {
-			return;
-		}
-
-		$login = $callback[1][1];
-		$player = $this->maniaControl->getPlayerManager()->getPlayer($login);
-		if ($player->authLevel <= 0) {
-			return;
-		}
-
-		switch ($actionId) {
-			case self::ML_ACTION_CORE_MANAGESETTINGS:
-				$pluginMenu = $this->maniaControl->getPluginManager()->getPluginMenu();
-				if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL")) {
-					$player->setCache($pluginMenu, PluginMenu::CACHE_SETTING_CLASS, "PluginMenu.Settings." . self::MATCHMANAGERCORE_PLUGIN);
-				} else {
-					$player->setCache($pluginMenu, PluginMenu::CACHE_SETTING_CLASS, self::MATCHMANAGERCORE_PLUGIN);
-				}
-				$this->maniaControl->getConfigurator()->showMenu($player, $pluginMenu);
-				break;
-			case self::ML_ACTION_CORE_STOPMATCH:
-				$this->MatchManagerCore->MatchStop();
-				break;
-			case self::ML_ACTION_CORE_PAUSEMATCH:
-				$this->MatchManagerCore->setNadeoPause();
-				break;
-			case self::ML_ACTION_CORE_SKIPROUND:
-				$this->MatchManagerCore->onCommandMatchEndWU(array(), $player); 
-				$this->MatchManagerCore->onCommandUnsetPause(array(), $player); 
-				$this->MatchManagerCore->onCommandMatchEndRound(array(), $player); 
-				break;
-			case self::ML_ACTION_CORE_STARTMATCH:
-				$this->MatchManagerCore->MatchStart();
-				break;
-			case self::ML_ACTION_MULTIPLECONFIGMANAGER_OPENCONFIGMANAGER:
-				/** @var \MatchManagerSuite\MatchManagerMultipleConfigManager */
-				$MatchManagerMultipleConfigManager = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERMULTIPLECONFIGMANAGER_PLUGIN);
-				if ($MatchManagerMultipleConfigManager !== null) {
-					$MatchManagerMultipleConfigManager->showConfigListUI(array(), $player);
-				}
-				break;
-			case self::ML_ACTION_GSHEET_MANAGESETTINGS:
-				$pluginMenu = $this->maniaControl->getPluginManager()->getPluginMenu();
-				if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL")) {
-					$player->setCache($pluginMenu, PluginMenu::CACHE_SETTING_CLASS, "PluginMenu.Settings." . self::MATCHMANAGERGSHEET_PLUGIN);
-				} else {
-					$player->setCache($pluginMenu, PluginMenu::CACHE_SETTING_CLASS, self::MATCHMANAGERGSHEET_PLUGIN);
-				}
-				$this->maniaControl->getConfigurator()->showMenu($player, $pluginMenu);
-				break;
 		}
 	}
 	
@@ -278,8 +178,6 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	 * @return void
 	 */
 	public function generateManialink() {
-		if ($this->MatchManagerCore === null) return;
-		$itemSize          = 6.;
 		$quadStyle         = $this->maniaControl->getManialinkManager()->getStyleManager()->getDefaultQuadStyle();
 		$quadSubstyle      = $this->maniaControl->getManialinkManager()->getStyleManager()->getDefaultQuadSubstyle();
 		$itemMarginFactorX = 1.3;
@@ -293,172 +191,175 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 		$posX = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_POSX);
 		$posY = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_POSY);
 
-		// Admin Menu Icon Frame
-		$iconFrame = new Frame();
-		$frame->addChild($iconFrame);
-		$iconFrame->setPosition($posX, $posY);
+		if (count($this->menuItems) > 0) {
+			// Admin Menu Icon Frame
+			$iconFrame = new Frame();
+			$frame->addChild($iconFrame);
+			$iconFrame->setPosition($posX, $posY);
 
-		$backgroundQuad = new Quad();
-		$iconFrame->addChild($backgroundQuad);
-		$backgroundQuad->setSize($itemSize * $itemMarginFactorX, $itemSize * $itemMarginFactorY);
-		$backgroundQuad->setStyles($quadStyle, $quadSubstyle);
-		$backgroundQuad->setZ(-1.);
+			$backgroundQuad = new Quad();
+			$iconFrame->addChild($backgroundQuad);
+			$backgroundQuad->setSize(self::ML_ITEM_SIZE * $itemMarginFactorX, self::ML_ITEM_SIZE * $itemMarginFactorY);
+			$backgroundQuad->setStyles($quadStyle, $quadSubstyle);
+			$backgroundQuad->setZ(-1.);
 
-		$itemQuad = new Label();
-		$iconFrame->addChild($itemQuad);
-		$itemQuad->setText('$fc3$w🏆$m');
-		$itemQuad->setSize($itemSize, $itemSize);
-		$itemQuad->setAreaFocusColor("00000000");
-		$itemQuad->setAreaColor("00000000");
+			$itemQuad = new Label();
+			$iconFrame->addChild($itemQuad);
+			$itemQuad->setText('$fc3$w🏆$m');
+			$itemQuad->setSize(self::ML_ITEM_SIZE, self::ML_ITEM_SIZE);
+			$itemQuad->setAreaFocusColor("00000000");
+			$itemQuad->setAreaColor("00000000");
 
-		// Admin Menu Description
-		$descriptionLabel = new Label();
-		$frame->addChild($descriptionLabel);
-		$descriptionLabel->setAlign($descriptionLabel::RIGHT, $descriptionLabel::TOP);
-		$descriptionLabel->setSize(40, 4);
-		$descriptionLabel->setTextSize(1);
-		$descriptionLabel->setTextColor('fff');
-		$descriptionLabel->setTextPrefix('$s');
+			// Admin Menu Description
+			$descriptionLabel = new Label();
+			$frame->addChild($descriptionLabel);
+			$descriptionLabel->setAlign(Label::RIGHT, Label::TOP);
+			$descriptionLabel->setSize(40, 4);
+			$descriptionLabel->setTextSize(1);
+			$descriptionLabel->setTextColor('fff');
+			$descriptionLabel->setTextPrefix('$s');
 
-		// Admin Menu
-		$popoutFrame = new Frame();
-		$frame->addChild($popoutFrame);
-		$popoutFrame->setPosition($posX - $itemSize * 0.5, $posY);
-		$popoutFrame->setHorizontalAlign($popoutFrame::RIGHT);
-		$popoutFrame->setVisible(false);
+			// Admin Menu
+			$popoutFrame = new Frame();
+			$frame->addChild($popoutFrame);
+			$popoutFrame->setPosition($posX - self::ML_ITEM_SIZE * 0.5, $posY);
+			$popoutFrame->setHorizontalAlign($popoutFrame::RIGHT);
+			$popoutFrame->setVisible(false);
 
-		$backgroundQuad = new Quad();
-		$popoutFrame->addChild($backgroundQuad);
-		$backgroundQuad->setHorizontalAlign($backgroundQuad::RIGHT);
-		$backgroundQuad->setStyles($quadStyle, $quadSubstyle);
+			$backgroundQuad = new Quad();
+			$popoutFrame->addChild($backgroundQuad);
+			$backgroundQuad->setHorizontalAlign($backgroundQuad::RIGHT);
+			$backgroundQuad->setStyles($quadStyle, $quadSubstyle);
+			$backgroundQuad->setZ(-1.);
 
-		$backgroundQuad->setZ(-1.);
+			$itemQuad->addToggleFeature($popoutFrame);
 
-		$itemQuad->addToggleFeature($popoutFrame);
+			// Add items
+			$itemPosX = -4.;
 
-		// Add items
-		$itemPosX = -1;
+			// sort by Order desc
+			usort($this->menuItems, function($a, $b) {
+				return $b->getOrder() <=> $a->getOrder();
+			});
 
-		// Settings:
-		$menuQuad = new Quad();
-		$popoutFrame->addChild($menuQuad);
-		$menuQuad->setStyle("UICommon64_1");
-		$menuQuad->setSubStyle("Settings_light");
-		$menuQuad->setSize($itemSize, $itemSize);
-		$menuQuad->setX($itemPosX);
-		$menuQuad->setHorizontalAlign($menuQuad::RIGHT);
-		$itemPosX -= $itemSize * 1.05;
-		$menuQuad->addTooltipLabelFeature($descriptionLabel, "Manage Core Settings");
-		$menuQuad->setAction(self::ML_ACTION_CORE_MANAGESETTINGS);
+			foreach ($this->menuItems as $menuItem) {
+				$menuItem->buildControl($popoutFrame, $descriptionLabel, $itemPosX);
+				$itemPosX -= self::ML_ITEM_SIZE * 1.05;
+			}
 
-		$MatchManagerMultipleConfigManager = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERMULTIPLECONFIGMANAGER_PLUGIN);
-		if ($MatchManagerMultipleConfigManager !== null) {
-			$menuQuad = new Quad();
-			$popoutFrame->addChild($menuQuad);
-			$menuQuad->setStyle("UICommon64_2");
-			$menuQuad->setSubStyle("Plugin_light");
-			$menuQuad->setSize($itemSize, $itemSize);
-			$menuQuad->setX($itemPosX);
-			$menuQuad->setHorizontalAlign($menuQuad::RIGHT);
-			$itemPosX -= $itemSize * 1.05;
-			$menuQuad->addTooltipLabelFeature($descriptionLabel, "Manage Multiple Configs");
-			$menuQuad->setAction(self::ML_ACTION_MULTIPLECONFIGMANAGER_OPENCONFIGMANAGER);
+			$descriptionLabel->setPosition($posX - (count($popoutFrame->getChildren()) - 1) * self::ML_ITEM_SIZE * 1.05 - 5, $posY);
+			$backgroundQuad->setSize((count($popoutFrame->getChildren()) - 1) * self::ML_ITEM_SIZE * 1.05 + 2, self::ML_ITEM_SIZE * $itemMarginFactorY);
 		}
-
-		$MatchManagerGsheet = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERGSHEET_PLUGIN);
-		if ($MatchManagerGsheet !== null) {
-			$menuQuad = new Quad();
-			$popoutFrame->addChild($menuQuad);
-			$menuQuad->setStyle("UICommon64_2");
-			$menuQuad->setSubStyle("DisplayIcons_light");
-			$menuQuad->setSize($itemSize, $itemSize);
-			$menuQuad->setX($itemPosX);
-			$menuQuad->setHorizontalAlign($menuQuad::RIGHT);
-			$itemPosX -= $itemSize * 1.05;
-			$menuQuad->addTooltipLabelFeature($descriptionLabel, "Manage Google Sheet config");
-			$menuQuad->setAction(self::ML_ACTION_GSHEET_MANAGESETTINGS);
-		}
-
-		if ($this->MatchManagerCore->getMatchStatus()) {
-			$menuQuad = new Quad();
-			$popoutFrame->addChild($menuQuad);
-			$menuQuad->setStyle("UICommon64_1");
-			$menuQuad->setSubStyle("Stop_light");
-			$menuQuad->setSize($itemSize, $itemSize);
-			$menuQuad->setX($itemPosX);
-			$menuQuad->setHorizontalAlign($menuQuad::RIGHT);
-			$itemPosX -= $itemSize * 1.05;
-			$menuQuad->addTooltipLabelFeature($descriptionLabel, "Stop the match");
-			$menuQuad->setAction(self::ML_ACTION_CORE_STOPMATCH);
-
-			$menuQuad = new Quad();
-			$popoutFrame->addChild($menuQuad);
-			$menuQuad->setStyle("UICommon64_1");
-			$menuQuad->setSubStyle("Pause_light");
-			$menuQuad->setSize($itemSize, $itemSize);
-			$menuQuad->setX($itemPosX);
-			$menuQuad->setHorizontalAlign($menuQuad::RIGHT);
-			$itemPosX -= $itemSize * 1.05;
-			$menuQuad->addTooltipLabelFeature($descriptionLabel, "Pause the match");
-			$menuQuad->setAction(self::ML_ACTION_CORE_PAUSEMATCH);
-
-			$menuQuad = new Quad();
-			$popoutFrame->addChild($menuQuad);
-			$menuQuad->setStyle("UICommon64_1");
-			$menuQuad->setSubStyle("Cross_light");
-			$menuQuad->setSize($itemSize, $itemSize);
-			$menuQuad->setX($itemPosX);
-			$menuQuad->setHorizontalAlign($menuQuad::RIGHT);
-			$itemPosX -= $itemSize * 1.05;
-			$menuQuad->addTooltipLabelFeature($descriptionLabel, "Skip the round / Warmup / Pause");
-			$menuQuad->setAction(self::ML_ACTION_CORE_SKIPROUND);
-		} else {
-			$menuQuad = new Quad();
-			$popoutFrame->addChild($menuQuad);
-			$menuQuad->setStyle("UICommon64_1");
-			$menuQuad->setSubStyle("Play_light");
-			$menuQuad->setSize($itemSize, $itemSize);
-			$menuQuad->setX($itemPosX);
-			$menuQuad->setHorizontalAlign($menuQuad::RIGHT);
-			$itemPosX -= $itemSize * 1.05;
-			$menuQuad->addTooltipLabelFeature($descriptionLabel, "Start the match");
-			$menuQuad->setAction(self::ML_ACTION_CORE_STARTMATCH);
-		}
-
-		$descriptionLabel->setPosition($posX - (count($popoutFrame->getChildren()) - 1) * $itemSize * 1.05 - 5, $posY);
-		$backgroundQuad->setSize((count($popoutFrame->getChildren()) - 1) * $itemSize * 1.05 + 2, $itemSize * $itemMarginFactorY);
 
 		$this->manialink = $maniaLink;
 		$this->displayManialink();
 	}
-	
-	/**
-	 * handlePluginUnloaded
-	 *
-	 * @param  string $pluginClass
-	 * @param  Plugin $plugin
-	 * @return void
-	 */
-	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
-		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
-			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
-			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
-		}
-		if (strstr($pluginClass, "MatchManagerSuite")) {
-			$this->generateManialink();
-		}
+
+	public function addMenuItem(MatchManagerAdminUI_MenuItem $menuItem) {
+		$this->removeMenuItem($menuItem->getActionId());
+		$this->menuItems[] = $menuItem;
+
+		$this->updateManialink = true;
 	}
 
-	/**
-	 * handlePluginLoaded
-	 *
-	 * @param  string $pluginClass
-	 * @param  Plugin $plugin
-	 * @return void
-	 */
-	public function handlePluginLoaded(string $pluginClass, Plugin $plugin) {
-		if (strstr($pluginClass, "MatchManagerSuite")) {
-			$this->generateManialink();
+	public function removeMenuItem(string $actionId) {
+		$this->menuItems = array_filter($this->menuItems, function($menuItem) use ($actionId) {
+			return $menuItem->getActionId() !== $actionId;
+		});
+
+		$this->updateManialink = true;
+	}
+}
+
+class MatchManagerAdminUI_MenuItem {
+	private string $actionId	;
+	private int $order = 100;
+	private string $description = '';
+	private string $text = '';
+	private string $imageUrl = '';
+	private string $style = '';
+	private string $subStyle = '';
+	private float $size = MatchManagerAdminUI::ML_ITEM_SIZE;
+
+	public function getActionId() {
+		return $this->actionId;
+	}
+	public function setActionId(string $actionId) {
+		$this->actionId = $actionId;
+		return $this;
+	}
+
+	public function getOrder() {
+		return $this->order;
+	}
+	public function setOrder(int $order) {
+		$this->order = $order;
+		return $this;
+	}
+	
+	public function getDescription() {
+		return $this->description;
+	}
+	public function setDescription(string $description) {
+		$this->description = $description;
+		return $this;
+	}
+	
+	public function getImageUrl() {
+		return $this->imageUrl;
+	}
+	public function setImageUrl(string $imageUrl) {
+		$this->imageUrl = $imageUrl;
+		return $this;
+	}
+
+	public function getSize() {
+		return $this->size;
+	}
+	public function setSize(float $size) {
+		$this->size = $size;
+		return $this;
+	}
+
+	public function getStyle() {
+		return $this->imageUrl;
+	}
+	public function setStyle(string $style) {
+		$this->style = $style;
+		return $this;
+	}
+
+	public function getSubStyle() {
+		return $this->imageUrl;
+	}
+	public function setSubStyle(string $subStyle) {
+		$this->subStyle = $subStyle;
+		return $this;
+	}
+
+	public function buildControl(Frame $parent, Label $descriptionLabel, float $posX) {
+		$control = null;
+		if ($this->text !== '') {
+			$control = new Label();
+			$control->setText($this->text);
+		} else {
+			$control = new Quad();
+			if ($this->imageUrl !== '') {
+				$control->setImageUrl($this->imageUrl);
+				$control->setKeepRatio('fit');
+				$control->setColorize('ffffff');
+			} else if ($this->style !== '') {
+				$control->setStyles($this->style, $this->subStyle);
+			} else {
+				$control->setBackgroundColor('cccccc');
+			}
 		}
+
+		$parent->addChild($control);
+		$control->setSize($this->size, $this->size);
+		$control->setX($posX);
+		$control->setHorizontalAlign(Quad::CENTER);
+		$control->addTooltipLabelFeature($descriptionLabel, $this->description);
+		$control->setAction($this->actionId);
 	}
 }
