@@ -491,15 +491,15 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 			$index++;
 		}
 
-		//Search for Map-Name
-		$mapNameButton = $this->maniaControl->getManialinkManager()->getElementBuilder()->buildRoundTextButton(
+		// Save config button
+		$saveConfigButton = $this->maniaControl->getManialinkManager()->getElementBuilder()->buildRoundTextButton(
 			'Save current config',
 			35,
 			5,
 			self::ML_ACTION_SAVE_CONFIG_PAGE
 		);
-		$frame->addChild($mapNameButton);
-		$mapNameButton->setPosition(-$width / 2 + 110, -$height / 2 + 6);
+		$frame->addChild($saveConfigButton);
+		$saveConfigButton->setPosition(-$width / 2 + 110, -$height / 2 + 6);
 
 		// Render and display xml
 		$this->maniaControl->getManialinkManager()->displayWidget($maniaLink, $player, self::ML_ID);
