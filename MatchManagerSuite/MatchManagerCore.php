@@ -2350,6 +2350,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					$player->setCache($pluginMenu, PluginMenu::CACHE_SETTING_CLASS, self::class);
 				}
 				$this->maniaControl->getConfigurator()->showMenu($player, $pluginMenu);
+				break;
 			case self::ML_ACTION_STOPMATCH:
 				$this->MatchStop();
 				break;
