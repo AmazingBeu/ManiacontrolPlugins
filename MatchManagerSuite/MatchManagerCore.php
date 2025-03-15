@@ -701,6 +701,35 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 */
 
 	/**
+	 * Reset match variables
+	 *
+	 * @param Setting $setting
+	*/
+	public function resetMatchVariables() {
+		$this->matchStarted		= false;
+		$this->matchrecover		= false;
+		$this->pauseon			= false;
+		$this->pointstorecover	= array();
+		$this->currentscore		= array(); // TODO CHECK
+		$this->preendroundscore	= null;
+		$this->settingsloaded	= false;
+		$this->mapsshuffled		= false;
+		$this->mapshidden		= false;
+		$this->hidenextmaps		= false;
+		$this->maps				= array();
+		$this->postmatch		= true;
+		$this->matchid			= "";
+
+		$this->settings_nbroundsbymap	= -1;
+		$this->settings_nbwinners		= 2;
+		$this->settings_nbmapsbymatch	= 0;
+		$this->settings_pointlimit		= 100;
+
+		$this->currentgmbase		= "";
+		$this->currentcustomgm		= "";
+		$this->currentsettingmode	= "";
+	}
+	/**
 	 * Add items in AdminUI plugin
 	 */
 	public function updateAdminUIMenuItems() {
@@ -737,6 +766,28 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		}
 	}
 
+	/**
+	 * Function called to list matches
+	 */
+	public function getMatchesList(int $limit = 10) {
+		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
+		$stmt = $mysqli->prepare("SELECT `gamemodebase`,`started`,`ended` FROM `" . self::DB_MATCHESINDEX . "` ORDER BY `started` DESC LIMIT ?");
+		$stmt->bind_param('i', $limit);
+
+		if (!$stmt->execute()) {
+			Logger::logError('Error executing MySQL query: '. $stmt->error);
+		}
+
+		$result = $stmt->get_result();
+		while($row = $result->fetch_array()) {
+			$array[] = $row;
+		}
+		return $array;
+	}
+
+	/*
+	 * MARK: Manage Settings
+	 */
 	/**
 	 * Update Widgets on Setting Changes
 	 *
@@ -804,77 +855,48 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			}
 		}
 
-		if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL") && $this->maniaControl->getSettingManager()->getSettingValue($this->maniaControl->getSettingManager(), SettingManager::SETTING_ALLOW_UNLINK_SERVER)) {
-			$deletesettings = !$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_DONT_DELETE_SETTINGS);
-		} else {
-			$deletesettings = true;
-		}
-		$allsettings = $this->maniaControl->getSettingManager()->getSettingsByClass($this);
-		$settingsmode = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE);
-		$modesettings = $this->getModeSettings($settingsmode);
-		foreach ($allsettings as $key => $value) {
-			$name = $value->setting;
-			if (array_key_exists($name,self::SETTINGS_MODE_LIST)) {
-				if (!isset($modesettings[$name])) {
-					if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
-				}
+		if ($setting === null || $setting->setting === self::SETTING_MATCH_SETTINGS_MODE || $setting->setting === self::SETTING_MATCH_GAMEMODE_BASE || $setting->setting === self::SETTING_MATCH_CUSTOM_GAMEMODE) {
+			if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL") && $this->maniaControl->getSettingManager()->getSettingValue($this->maniaControl->getSettingManager(), SettingManager::SETTING_ALLOW_UNLINK_SERVER)) {
+				$deletesettings = !$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_DONT_DELETE_SETTINGS);
+			} else {
+				$deletesettings = true;
 			}
-		}
-		foreach ($modesettings as $key => $value) {
-			$this->maniaControl->getSettingManager()->initSetting($this, $key, self::SETTINGS_MODE_LIST[$key]['default'], self::SETTINGS_MODE_LIST[$key]['description'], 50);
-		}
-
-		if ($settingsmode == 'Maps from file & Settings from plugin' || $settingsmode == 'All from the plugin') {
-			$gmsettings = $this->getGMSettings($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE), $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE));
-
+			$allsettings = $this->maniaControl->getSettingManager()->getSettingsByClass($this);
+			$settingsmode = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE);
+			$modesettings = $this->getModeSettings($settingsmode);
 			foreach ($allsettings as $key => $value) {
 				$name = $value->setting;
-				if (substr($name,0, 2) == "S_" && !isset($gmsettings[$name])) {
-					if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+				if (array_key_exists($name,self::SETTINGS_MODE_LIST)) {
+					if (!isset($modesettings[$name])) {
+						if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+					}
 				}
 			}
-			foreach ($gmsettings as $key => $value) {
-				$this->maniaControl->getSettingManager()->initSetting($this, $key, $value['default'], $value['description'], 100);
+			foreach ($modesettings as $key => $value) {
+				$this->maniaControl->getSettingManager()->initSetting($this, $key, self::SETTINGS_MODE_LIST[$key]['default'], self::SETTINGS_MODE_LIST[$key]['description'], 50);
 			}
-		} else {
-			foreach ($allsettings as $key => $value) {
-				$name = $value->setting;
-				if (substr($name,0, 2) == "S_") {
-					if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+
+			if ($settingsmode == 'Maps from file & Settings from plugin' || $settingsmode == 'All from the plugin') {
+				$gmsettings = $this->getGMSettings($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE), $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE));
+
+				foreach ($allsettings as $key => $value) {
+					$name = $value->setting;
+					if (substr($name,0, 2) == "S_" && !isset($gmsettings[$name])) {
+						if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+					}
+				}
+				foreach ($gmsettings as $key => $value) {
+					$this->maniaControl->getSettingManager()->initSetting($this, $key, $value['default'], $value['description'], 100);
+				}
+			} else {
+				foreach ($allsettings as $key => $value) {
+					$name = $value->setting;
+					if (substr($name,0, 2) == "S_") {
+						if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+					}
 				}
 			}
 		}
-	}
-
-
-	/**
-	 * Reset match variables
-	 *
-	 * @param Setting $setting
-	*/
-	public function resetMatchVariables() {
-		$this->matchStarted		= false;
-		$this->matchrecover		= false;
-		$this->pauseon			= false;
-		$this->pointstorecover	= array();
-		$this->currentscore		= array(); // TODO CHECK
-		$this->preendroundscore	= null;
-		$this->settingsloaded	= false;
-		$this->mapsshuffled		= false;
-		$this->mapshidden		= false;
-		$this->hidenextmaps		= false;
-		$this->maps				= array();
-		$this->postmatch		= true;
-		$this->matchid			= "";
-
-		$this->settings_nbroundsbymap	= -1;
-		$this->settings_nbwinners		= 2;
-		$this->settings_nbmapsbymatch	= 0;
-		$this->settings_pointlimit		= 100;
-
-		$this->currentgmbase		= "";
-		$this->currentcustomgm		= "";
-		$this->currentsettingmode	= "";
 	}
 
 	/**
@@ -893,67 +915,119 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	}
 
 	/**
+	 * Get recursively Custom gamemodes settings
+	 * @param string $customgamemode 
+	 * @return mixed 
+	 */
+	private function getCustomGMSettings(string $customgamemode) {
+		$filename = $this->maniaControl->getServer()->getDirectory()->getUserDataFolder() . DIRECTORY_SEPARATOR . "Scripts" . DIRECTORY_SEPARATOR . $customgamemode;
+		if (!file_exists($filename)) return [];
+
+		$fileContent = file_get_contents($filename);
+		preg_match('/^\s*\#Extends\s+"(.*)"/m', $fileContent, $matches);
+
+		$gamesettings = [];
+
+		if (count($matches) >= 2) {
+			$gamesettings = $this->getCustomGMSettings($matches[1]);
+		}
+
+		// Replace all line breaks and double quote between triple quotes strings.
+		$fileContent = preg_replace_callback('/"""(.*?)"""/s', function($matches) {
+			$processedString = str_replace(["\r\n", "\n", "\r"], " ", $matches[1]);
+			$processedString = str_replace(["\""], "\\\"", $processedString);
+			return '"' . $processedString . '"';
+		}, $fileContent);
+
+		foreach(preg_split("/((\r?\n)|(\r\n?))/", $fileContent) as $line){
+			if (preg_match('/^\*\*\*/', $line)) break;
+
+			if (preg_match('/^(\s*)\#Setting\s+(S_\S+)\s+(\S+)\s*(as\s|)(_\(|)("|\'|)([^\'"]*)("\)|\'\)|"|\'| |)/', $line, $matches)) {
+				$gamesettingname = $matches[2];
+				$defaultvalue = $matches[3];
+				$description = $matches[7];
+
+				if (is_numeric($matches[3]) && is_float($matches[3]+0)) {
+					$type = "float";
+				} else if (is_numeric($matches[3])) {
+					$type = "integer";
+				} else if (strtolower($matches[3]) == "true" || strtolower($matches[3]) == "false") {
+					$type = "boolean";
+					if (strtolower($matches[3]) == "false") $defaultvalue = "";
+				} else {
+					// Assuming it's a string, and because it can have spaces, we re-do the regexp
+					$type = "string";
+					preg_match_all('/(?<!\\\\)"((?:\\\\"|[^"])*?)(?<!\\\\)"/', $line, $stringMatches);
+
+					if (count($stringMatches) < 2) continue; // just in case it's not a string, and an another setting type
+
+					$defaultvalue = $stringMatches[1][0] ?? "";
+					$defaultvalue = str_replace("\\\"", "\"", $defaultvalue); // replace escaped double quote
+					$description = $stringMatches[1][1] ?? "";	
+				}
+				
+				settype($defaultvalue, $type);
+
+				if (array_key_exists($gamesettingname, $gamesettings)) {
+					$gamesettings[$gamesettingname]['default'] = $defaultvalue;
+				} else {
+					$gamesettings[$gamesettingname] = [
+						'type' => $type,
+						'default' => $defaultvalue,
+						'description' => $description
+					];
+				}
+			}
+		}
+
+
+		return $gamesettings;
+	}
+
+	/**
 	 * Get Array with all settings of the Gamemode
 	 * 
 	 * @param String $gamemode
 	*/
 	public function getGMSettings(String $gamemodebase, String $customgamemode) {
-		$gamesettings = [];
+		$starttime = hrtime(true);
+
+		$gameSettings = [];
 
 		foreach (self::GAMEMODES_LIST_SETTINGS as $gamesetting => $info) {
 			if (in_array('Global', $info['gamemode']) || in_array($gamemodebase, $info['gamemode'])) {
-				$gamesettings = array_merge($gamesettings , array($gamesetting => $info));
+				$gameSettings = array_merge($gameSettings , array($gamesetting => $info));
 			}
 		}
-		if ($customgamemode != "") {
+		if ($customgamemode !== "") { // TODO improve detection
 			$filename = $this->maniaControl->getServer()->getDirectory()->getUserDataFolder() . DIRECTORY_SEPARATOR . "Scripts" . DIRECTORY_SEPARATOR . "Modes" . DIRECTORY_SEPARATOR . $customgamemode;
 			if (file_exists($filename)) {
-				$handle = fopen($filename, "r");
-				if ($handle) {
-					while (($line = fgets($handle)) !== false) {
-						if (preg_match('/^(\s*)\#Setting\s+(S_\S+)\s+(\S+)\s*(as\s|)(_\(|)("|\'|)([^\'"]*)("\)|\'\)|"|\'| |)/', $line, $matches)) {
-							$gamesettingname = $matches[2];
-							$defaultvalue = $matches[3];
-							if (is_numeric($matches[3]) && is_float($matches[3]+0)) {
-								$type = "float";
-							} else if (is_numeric($matches[3])) {
-								$type = "integer";
-							} else if (strtolower($matches[3]) == "true" || strtolower($matches[3]) == "false") {
-								$type = "boolean";
-								if (strtolower($matches[3]) == "false") $defaultvalue = "";
-							} else {
-								$defaultvalue = str_replace(["'", '"'], "" , $matches[3]);
-								$type = "string";
-							}
-							$description = $matches[7];
-							settype($defaultvalue, $type);
+				$customSettings = $this->getCustomGMSettings("Modes". DIRECTORY_SEPARATOR . $customgamemode);
 
-							$gamesettings = array_merge($gamesettings , array($gamesettingname => [
-								'type' => $type,
-								'default' => $defaultvalue,
-								'description' => $description
-							]));
-						} else if (preg_match('/^\*\*\*/',$line)) {
-							break;
-						}
+				foreach ($customSettings as $settingName => $setting) {
+					if (array_key_exists($settingName, $gameSettings)) {
+						$gameSettings[$settingName]['default'] = $setting['default'];
+					} else {
+						$gameSettings[$settingName] = $setting;
 					}
-					fclose($handle);
-				} else {
-					Logger::logError("Impossible to read custom gamemode file");
-					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " Impossible to read custom gamemode file");
 				}
+			} else {
+				Logger::logError("Impossible to read custom gamemode file");
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " Impossible to read custom gamemode file");
 			}
 		}
 
-		foreach ($gamesettings as $settingname => $info) {
-			$gamesettings[$settingname]['value'] = $this->maniaControl->getSettingManager()->getSettingValue($this, $settingname);
-			if ($gamesettings[$settingname]['value'] == null) {
-				$gamesettings[$settingname]['value'] = $info['default'];
+		foreach ($gameSettings as $settingname => $info) {
+			$gameSettings[$settingname]['value'] = $this->maniaControl->getSettingManager()->getSettingValue($this, $settingname);
+			if ($gameSettings[$settingname]['value'] == null) {
+				$gameSettings[$settingname]['value'] = $info['default'];
 			}
-			settype($gamesettings[$settingname]['value'], $info['type']);
+			settype($gameSettings[$settingname]['value'], $info['type']);
 		}
 
-		return $gamesettings;
+		var_dump('getGMSettings '. $customgamemode . ' duration: '. hrtime(true) - $starttime . '(now: '. hrtime(true) .' - starttime: '. $starttime .')');
+
+		return $gameSettings;
 	}
 
 	/**
@@ -1000,25 +1074,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		if (isset($this->currentgmsettings[self::SETTING_MATCH_S_DISABLEGOTOMAP])) {	
 			$this->settings_disablegotomap	= (bool) $this->currentgmsettings[self::SETTING_MATCH_S_DISABLEGOTOMAP];
 		}
-	}
-
-	/**
-	 * Function called to list matches
-	 */
-	public function getMatchesList(int $limit = 10) {
-		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
-		$stmt = $mysqli->prepare("SELECT `gamemodebase`,`started`,`ended` FROM `" . self::DB_MATCHESINDEX . "` ORDER BY `started` DESC LIMIT ?");
-		$stmt->bind_param('i', $limit);
-
-		if (!$stmt->execute()) {
-			Logger::logError('Error executing MySQL query: '. $stmt->error);
-		}
-
-		$result = $stmt->get_result();
-		while($row = $result->fetch_array()) {
-			$array[] = $row;
-		}
-		return $array;
 	}
 
 	/*
