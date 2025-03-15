@@ -1590,7 +1590,12 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * @param integer $time
 	 */
 	public function setNadeoPause($admin = false, $time = null) {
-		Logger::log("Nadeo Pause");
+		if ($this->pauseon) {
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Can\'t launch pause, already running');
+			Logger::logError('Can\'t launch pause, already running');
+			return;
+		}
+		Logger::log("Launching Pause");
 
 		if ($time === null) {
 			$this->pausetimer = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_PAUSE_DURATION);
@@ -2124,26 +2129,35 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			return;
 		}
 
-		if (($this->matchStarted) && (!in_array($this->currentgmbase, ["Laps", "TimeAttack", "RoyalTimeAttack"]) || ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from file' && !empty($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE))))) {
+		if (!$this->getMatchIsRunning()) {
+			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Can\'t start Pause: Match not started', $player);
+		} else if ($this->pauseon) {
+			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Can\'t start Pause: Pause already running', $player);
+		} else if (in_array($this->currentgmbase, ["Laps", "TimeAttack", "RoyalTimeAttack"])) {
+			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Can\'t start Pause: Invalid gamemode base', $player);
+		} else {
 			$text = $chatCallback[1][2];
 			$text = explode(" ", $text);
 			if (isset($text[1]) && $text[1] != "") {
 				if (is_numeric($text[1]) && $text[1] > 0) {
-					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Admin force a break for $<$ff0' . $text[1] . '$> seconds!');
+					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Admin force a pause for $<$ff0' . $text[1] . '$> seconds!');
 					$this->setNadeoPause(true, $text[1]);
 				} elseif (is_numeric($text[1]) && $text[1] == 0) {
-					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Admin force an unlimited break');
+					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Admin force an unlimited pause');
 					$this->setNadeoPause(true, $text[1]);
 				} else {
 					$this->maniaControl->getChat()->sendError($this->chatprefix . 'Pause time sent is invalid', $player);
 				}
 			} else {
-				$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Admin force a break for ' . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_PAUSE_DURATION) . ' seconds!');
+				$duration = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_PAUSE_DURATION);
+				if ($duration > 0) {
+					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Admin force a pause for ' . $duration . ' seconds!');
+				} else {
+					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Admin force a pause');
+				}
+				
 				$this->setNadeoPause(true);
 			}
-		}
-		else {
-			$this->maniaControl->getChat()->sendError($this->chatprefix . 'Can\'t start Pause, match not started (or TA)', $player);
 		}
 	}
 
