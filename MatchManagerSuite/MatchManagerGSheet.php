@@ -44,7 +44,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	const PLUGIN_AUTHOR										= 'Beu';
 
 	// Other MatchManager plugin
-	const MATCHMANAGERADMINUI_PLUGIN							= 'MatchManagerSuite\MatchManagerAdminUI';
+	const MATCHMANAGERADMINUI_PLUGIN						= 'MatchManagerSuite\MatchManagerAdminUI';
 
 	// Actions
 	const ML_ACTION_OPENSETTINGS 							= 'MatchManagerSuite\MatchManagerGSheet.OpenSettings';
@@ -173,8 +173,6 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		$this->maniaControl->getManialinkManager()->registerManialinkPageAnswerListener(self::ML_ACTION_OPENSETTINGS, $this, 'handleActionOpenSettings');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::AFTERINIT, $this, 'handleAfterInit');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_LOADED, $this, 'handlePluginLoaded');
-
-		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PlayerManager::CB_PLAYERCONNECT, $this, 'handlePlayerConnect');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_UNLOADED, $this, 'handlePluginUnloaded');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(SettingManager::CB_SETTING_CHANGED, $this, 'updateSettings');
