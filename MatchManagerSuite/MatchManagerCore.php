@@ -990,8 +990,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * @param String $gamemode
 	*/
 	public function getGMSettings(String $gamemodebase, String $customgamemode) {
-		$starttime = hrtime(true);
-
 		$gameSettings = [];
 
 		foreach (self::GAMEMODES_LIST_SETTINGS as $gamesetting => $info) {
@@ -1024,8 +1022,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			}
 			settype($gameSettings[$settingname]['value'], $info['type']);
 		}
-
-		var_dump('getGMSettings '. $customgamemode . ' duration: '. hrtime(true) - $starttime . '(now: '. hrtime(true) .' - starttime: '. $starttime .')');
 
 		return $gameSettings;
 	}
