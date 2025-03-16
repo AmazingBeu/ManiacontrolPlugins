@@ -37,7 +37,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 158;
-	const PLUGIN_VERSION									= 1.4;
+	const PLUGIN_VERSION									= 1.5;
 	const PLUGIN_NAME										= 'MatchManager Ready Button';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -58,7 +58,6 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl 			= null;
 	private $MatchManagerCore		= null;
-	private $chatprefix				= '$<$fc3$w🏆$m$> '; // Would like to create a setting but MC database doesn't support utf8mb4
 
 	private $playersreadystate		= array();
 
@@ -235,7 +234,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 				} else if (!$player->isSpectator && !isset($this->playersreadystate[$player->login])) {
 					$this->playersreadystate[$player->login] = 0;
 					$this->maniaControl->getManialinkManager()->sendManialink($this->MLisNotReady, $player->login, ToggleUIFeature: false);
-					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'You can now set you $<$f00Ready$> by clicking on the button', $player);
+					$this->maniaControl->getChat()->sendSuccess($this->MatchManagerCore->getChatPrefix() . 'You can now set you $<$f00Ready$> by clicking on the button', $player);
 				} else if (!$player->isSpectator && isset($this->playersreadystate[$player->login])) {
 					if ($this->playersreadystate[$player->login] == 1) {
 						$this->maniaControl->getManialinkManager()->sendManialink($this->MLisReady, $player->login, ToggleUIFeature: false);
@@ -283,10 +282,10 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 		if (isset($this->playersreadystate[$player->login])) {
 			if ($this->playersreadystate[$player->login] == 0) {
 				$this->playersreadystate[$player->login] = 1;
-				$this->maniaControl->getChat()->sendInformation($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> now is $<$z$0f0ready$>');
+				$this->maniaControl->getChat()->sendInformation($this->MatchManagerCore->getChatPrefix() . 'Player $<$ff0' . $player->nickname . '$> now is $<$z$0f0ready$>');
 			} elseif ($this->playersreadystate[$player->login] == 1) {
 				$this->playersreadystate[$player->login] = 0;
-				$this->maniaControl->getChat()->sendInformation($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> now is $<$z$f00not ready$>');
+				$this->maniaControl->getChat()->sendInformation($this->MatchManagerCore->getChatPrefix() . 'Player $<$ff0' . $player->nickname . '$> now is $<$z$f00not ready$>');
 			}
 			$this->StartMatchIfNeeded($player);
 		}

@@ -38,7 +38,7 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	 * Constants
 	 */
 	const PLUGIN_ID											= 159;
-	const PLUGIN_VERSION									= 1.4;
+	const PLUGIN_VERSION									= 1.5;
 	const PLUGIN_NAME										= 'MatchManager Players Pause';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -59,7 +59,6 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl 			= null;
 	private $MatchManagerCore		= null;
-	private $chatprefix				= '$<$fc3$w🏆$m$> '; // Would like to create a setting but MC database doesn't support utf8mb4
 
 	private $playerspausestate		= array();
 
@@ -215,11 +214,11 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 					Logger::log('Pause requested by players');
 					if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_PAUSE_WAIT_END_ROUND)) {
 						if ($this->maniaControl->getSettingManager()->getSettingValue($this->maniaControl, MatchManagerCore::SETTING_MATCH_PAUSE_DURATION) <= 0) {
-							$this->maniaControl->getChat()->sendInformation($this->chatprefix . 'Ask the admins to resume the match');
+							$this->maniaControl->getChat()->sendInformation($this->MatchManagerCore->getChatPrefix() . 'Ask the admins to resume the match');
 						}
 						$this->MatchManagerCore->setNadeoPause();
 					} else {
-						$this->maniaControl->getChat()->sendInformation($this->chatprefix . 'Pause will start at the end of this round');
+						$this->maniaControl->getChat()->sendInformation($this->MatchManagerCore->getChatPrefix() . 'Pause will start at the end of this round');
 						$this->LaunchPauseAtTheEnd = true;
 					}
 					return;
@@ -296,10 +295,10 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 		if (isset($this->playerspausestate[$player->login])) {
 			if ($this->playerspausestate[$player->login] == 0) {
 				$this->playerspausestate[$player->login] = 1;
-				$this->maniaControl->getChat()->sendInformation($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> asks a pause');
+				$this->maniaControl->getChat()->sendInformation($this->MatchManagerCore->getChatPrefix() . 'Player $<$ff0' . $player->nickname . '$> asks a pause');
 			} elseif ($this->playerspausestate[$player->login] == 1) {
 				$this->playerspausestate[$player->login] = 0;
-				$this->maniaControl->getChat()->sendInformation($this->chatprefix . 'Player $<$ff0' . $player->nickname . '$> no longer asks for a pause');
+				$this->maniaControl->getChat()->sendInformation($this->MatchManagerCore->getChatPrefix()  . 'Player $<$ff0' . $player->nickname . '$> no longer asks for a pause');
 			}
 			$this->PauseMatchIfNeeded($player);
 		}
@@ -322,7 +321,7 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	public function handleBeginRoundCallback() {
 		if ($this->LaunchPauseAtTheEnd) {
 			if ($this->maniaControl->getSettingManager()->getSettingValue($this->maniaControl, MatchManagerCore::SETTING_MATCH_PAUSE_DURATION) <= 0) {
-				$this->maniaControl->getChat()->sendInformation($this->chatprefix . 'Ask the admins to resume the match');
+				$this->maniaControl->getChat()->sendInformation($this->MatchManagerCore->getChatPrefix() . 'Ask the admins to resume the match');
 			}
 
 			$this->LaunchPauseAtTheEnd = false;
