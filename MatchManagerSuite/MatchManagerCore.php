@@ -43,7 +43,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * MARK: Constants
 	 */
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 5.6;
+	const PLUGIN_VERSION									= 5.7;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
