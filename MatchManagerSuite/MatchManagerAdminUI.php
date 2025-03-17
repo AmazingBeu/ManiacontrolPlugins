@@ -31,7 +31,7 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	 * Constants
 	 */
 	const PLUGIN_ID											= 174;
-	const PLUGIN_VERSION									= 2.0;
+	const PLUGIN_VERSION									= 2.1;
 	const PLUGIN_NAME										= 'MatchManager Admin UI';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -347,7 +347,6 @@ class MatchManagerAdminUI_MenuItem {
 			if ($this->imageUrl !== '') {
 				$control->setImageUrl($this->imageUrl);
 				$control->setKeepRatio('fit');
-				$control->setColorize('ffffff');
 			} else if ($this->style !== '') {
 				$control->setStyles($this->style, $this->subStyle);
 			} else {
