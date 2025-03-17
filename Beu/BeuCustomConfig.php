@@ -79,7 +79,7 @@ class BeuCustomConfig implements CallbackListener, Plugin {
 	 * @see \ManiaControl\Plugins\Plugin::getDescription()
 	 */
 	public static function getDescription() {
-		return "A plugin to display a donation button";
+		return "Default config for event servers";
 	}
 
 	/**
