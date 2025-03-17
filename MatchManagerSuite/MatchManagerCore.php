@@ -43,7 +43,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * MARK: Constants
 	 */
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 5.7;
+	const PLUGIN_VERSION									= 5.8;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -1083,7 +1083,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	public function addCanStartFunction(CallbackListener $listener, string $method) {
 		if (!Listening::checkValidCallback($listener, $method))	return;
 
-		if (!array_key_exists($listener::class . "::" . $method, $this->canStartCallbacks)) {
+		if (!array_key_exists(get_class($listener) . "::" . $method, $this->canStartCallbacks)) {
 			$this->canStartCallbacks[] = new Listening($listener, $method);
 		}
 	}
@@ -1094,7 +1094,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * @param string $method 
 	 */
 	public function removeCanStartFunction(CallbackListener $listener, string $method) {
-		$name = $listener::class . "::" . $method;
+		$name = get_class($listener) . "::" . $method;
 		if (array_key_exists($name, $this->canStartCallbacks)) {
 			$this->canStartCallbacks = array_diff_key($this->canStartCallbacks, [$name]);
 		}
