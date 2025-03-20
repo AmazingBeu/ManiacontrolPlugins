@@ -44,7 +44,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 * Constants
 	 */
 	const PLUGIN_ID											= 171;
-	const PLUGIN_VERSION									= 1.5;
+	const PLUGIN_VERSION									= 1.6;
 	const PLUGIN_NAME										= 'MatchManager Multiple Config Manager';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -240,12 +240,14 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 			return;
 		}
 
-		switch ($actionId) {
+		$action = $actionArray[0] . "." . $actionArray[1];
+
+		switch ($action) {
 			case self::ML_ACTION_OPENSETTINGS:
 				$this->showConfigListUI(array(), $player);
 				break;
 			case self::ML_ACTION_REMOVE_CONFIG:
-				$id = intval($actionArray[3]);
+				$id = intval($actionArray[2]);
 				Logger::log("[MatchManagerMultipleConfigManager] Removing config: " . $id);
 				$mysqli = $this->maniaControl->getDatabase()->getMysqli();
 
@@ -260,7 +262,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 				$this->showConfigListUI(array(), $player);
 				break;
 			case self::ML_ACTION_LOAD_CONFIG:
-				$id = intval($actionArray[3]);
+				$id = intval($actionArray[2]);
 				// Hide loading before because it can take few seconds
 				$this->maniaControl->getManialinkManager()->hideManialink(ManialinkManager::MAIN_MLID, $login);
 				$this->loadConfig($id);
