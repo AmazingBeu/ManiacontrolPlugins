@@ -39,7 +39,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 2.2;
+	const PLUGIN_VERSION									= 2.3;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -588,6 +588,9 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		$spreadsheetid = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET);
 		if ($spreadsheetid === "") return;
 
+		$sheetname = $this->getSheetName();
+		if ($sheetname === "") return;
+
 		foreach ($currentscore as $key => $score) {
 			$name = "~";
 			$player = $this->maniaControl->getPlayerManager()->getPlayer($score[1]);
@@ -599,8 +602,6 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		$matchstatus = $this->matchstatus;
 
 		if ($this->refreshTokenIfNeeded()) {
-			$sheetname = $this->getSheetName();
-
 			$data = new \stdClass;
 			$data->valueInputOption = "RAW";
 
@@ -748,12 +749,15 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		$spreadsheetid = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET);
 		if ($spreadsheetid === "") return;
 
+		$sheetname = $this->getSheetName();
+		if ($sheetname === "") return;
+
 		if ($this->refreshTokenIfNeeded()) {
 			$this->matchid = $matchid;
 			$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $spreadsheetid);
 			$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
 			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
-			$asyncHttpRequest->setCallable(function ($json, $error) {
+			$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname) {
 				if (!$json || $error) {
 					Logger::logError('Error from Google API: ' . $error);
 					$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
@@ -773,7 +777,6 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 
 				if ($data->properties->title) {
 					$sheetsid = array();
-					$sheetname = $this->getSheetName();
 					$sheetexists = false;
 					foreach($data->sheets as $value) {
 						if ($value->properties->title == $sheetname) {
@@ -798,6 +801,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	}
 
 	private function PrepareSheet(String $sheetname, bool $sheetexists, Array $sheetsid) {
+		if ($sheetname === "") return;
 		$spreadsheetid = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET);
 		if ($spreadsheetid === "") return;
 
