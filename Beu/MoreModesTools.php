@@ -166,7 +166,7 @@ class MoreModesTools implements CommandListener, Plugin {
 		$text = explode(" ", $text);
 
 		if (count($text) < 3) {
-			$this->maniaControl->getChat()->sendError('Missing parameters. Eg: //matchsetpoints <Player Name or Login> <Match points> <Map Points (optional)> <Round Points (optional)>', $adminplayer);
+			$this->maniaControl->getChat()->sendError('Missing parameters. Eg: //setpoints <Player Name or Login> <Match points> <Map Points (optional)> <Round Points (optional)>', $adminplayer);
 			return;
 		}
 
