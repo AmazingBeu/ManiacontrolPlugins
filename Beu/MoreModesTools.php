@@ -20,7 +20,7 @@ class MoreModesTools implements CommandListener, Plugin {
 	 * Constants
 	 */
 	const PLUGIN_ID			= 164;
-	const PLUGIN_VERSION	= 1.2;
+	const PLUGIN_VERSION	= 1.3;
 	const PLUGIN_NAME		= 'MoreModesTools';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -83,7 +83,7 @@ class MoreModesTools implements CommandListener, Plugin {
 		$this->maniaControl->getCommandManager()->registerCommandListener(['endwu', 'endwarmup'], $this, 'onCommandEndWarmUp', true, 'End the WarmUp');
 		$this->maniaControl->getCommandManager()->registerCommandListener(['extendwu', 'extendwarmup'], $this, 'onCommandExtendWarmUp', true, 'If the warm up has a time limit, increase it');
 		$this->maniaControl->getCommandManager()->registerCommandListener('setpoints', $this, 'onCommandSetPoints', true, 'Set Points for a player');
-		$this->maniaControl->getCommandManager()->registerCommandListener('setteampoints', $this, 'onCommandSetPoints', true, 'Set Points for a team');
+		$this->maniaControl->getCommandManager()->registerCommandListener('setteampoints', $this, 'onCommandSetTeamPoints', true, 'Set Points for a team');
 
 		return true;
 	}
@@ -240,7 +240,7 @@ class MoreModesTools implements CommandListener, Plugin {
 		$text = explode(" ", $text);
 
 		if (count($text) < 3) {
-			$this->maniaControl->getChat()->sendError('Missing parameters. Eg: //matchsetteampoints <Team Name or Id> <Match points> <Map Points (optional)> <Round Points (optional)>', $adminplayer);
+			$this->maniaControl->getChat()->sendError('Missing parameters. Eg: //setteampoints <Team Name or Id> <Match points> <Map Points (optional)> <Round Points (optional)>', $adminplayer);
 			return;
 		}
 
