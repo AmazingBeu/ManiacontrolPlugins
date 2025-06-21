@@ -863,36 +863,38 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			}
 			$allsettings = $this->maniaControl->getSettingManager()->getSettingsByClass($this);
 			$settingsmode = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE);
-			$modesettings = $this->getModeSettings($settingsmode);
-			foreach ($allsettings as $key => $value) {
-				$name = $value->setting;
-				if (array_key_exists($name,self::SETTINGS_MODE_LIST)) {
-					if (!isset($modesettings[$name])) {
-						if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
-					}
-				}
-			}
-			foreach ($modesettings as $key => $value) {
-				$this->maniaControl->getSettingManager()->initSetting($this, $key, self::SETTINGS_MODE_LIST[$key]['default'], self::SETTINGS_MODE_LIST[$key]['description'], 50);
-			}
-
-			if ($settingsmode == 'Maps from file & Settings from plugin' || $settingsmode == 'All from the plugin') {
-				$gmsettings = $this->getGMSettings($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE), $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE));
-
+			if ($allsettings !== null && $settingsmode !== null) {
+				$modesettings = $this->getModeSettings($settingsmode);
 				foreach ($allsettings as $key => $value) {
 					$name = $value->setting;
-					if (substr($name,0, 2) == "S_" && !isset($gmsettings[$name])) {
-						if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+					if (array_key_exists($name,self::SETTINGS_MODE_LIST)) {
+						if (!isset($modesettings[$name])) {
+							if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+						}
 					}
 				}
-				foreach ($gmsettings as $key => $value) {
-					$this->maniaControl->getSettingManager()->initSetting($this, $key, $value['default'], $value['description'], 100);
+				foreach ($modesettings as $key => $value) {
+					$this->maniaControl->getSettingManager()->initSetting($this, $key, self::SETTINGS_MODE_LIST[$key]['default'], self::SETTINGS_MODE_LIST[$key]['description'], 50);
 				}
-			} else {
-				foreach ($allsettings as $key => $value) {
-					$name = $value->setting;
-					if (substr($name,0, 2) == "S_") {
-						if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+	
+				if ($settingsmode == 'Maps from file & Settings from plugin' || $settingsmode == 'All from the plugin') {
+					$gmsettings = $this->getGMSettings($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE), $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE));
+	
+					foreach ($allsettings as $key => $value) {
+						$name = $value->setting;
+						if (substr($name,0, 2) == "S_" && !isset($gmsettings[$name])) {
+							if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+						}
+					}
+					foreach ($gmsettings as $key => $value) {
+						$this->maniaControl->getSettingManager()->initSetting($this, $key, $value['default'], $value['description'], 100);
+					}
+				} else {
+					foreach ($allsettings as $key => $value) {
+						$name = $value->setting;
+						if (substr($name,0, 2) == "S_") {
+							if ($deletesettings) $this->maniaControl->getSettingManager()->deleteSetting($this, $name);
+						}
 					}
 				}
 			}
