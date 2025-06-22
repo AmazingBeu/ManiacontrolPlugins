@@ -26,7 +26,7 @@ class SmallTextOverlay implements TimerListener, CallbackListener, Plugin {
 	* Constants
 	*/
 	const PLUGIN_ID			= 195;
-	const PLUGIN_VERSION	= 1.0;
+	const PLUGIN_VERSION	= 1.1;
 	const PLUGIN_NAME		= 'SmallTextOverlay';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -115,7 +115,7 @@ class SmallTextOverlay implements TimerListener, CallbackListener, Plugin {
 	 * @param  Setting $setting
 	 * @return void
 	 */
-	public function updateSettings(Setting $setting = null) {
+	public function updateSettings(?Setting $setting = null) {
 		if ($setting !== null && !$setting->belongsToClass($this)) {
 			return;
 		}

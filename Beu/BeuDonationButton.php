@@ -25,7 +25,7 @@ class BeuDonationButton implements ManialinkPageAnswerListener, CallbackListener
 	* Constants
 	*/
 	const PLUGIN_ID			= 169;
-	const PLUGIN_VERSION	= 1.0;
+	const PLUGIN_VERSION	= 1.1;
 	const PLUGIN_NAME		= 'Beu Donation Button';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -103,7 +103,7 @@ class BeuDonationButton implements ManialinkPageAnswerListener, CallbackListener
 		$this->maniaControl->getManialinkManager()->sendManialink($this->manialink,$player->login);
 	}
 
-	public function updateSettings(Setting $setting = null) {
+	public function updateSettings(?Setting $setting = null) {
 		$this->generateManialink();
 		$this->maniaControl->getManialinkManager()->sendManialink($this->manialink);
 	}

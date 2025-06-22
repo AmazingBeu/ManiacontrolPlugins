@@ -31,7 +31,7 @@ class BeuCustomConfig implements CallbackListener, Plugin {
 	* Constants
 	*/
 	const PLUGIN_ID			= 193;
-	const PLUGIN_VERSION	= 1.2;
+	const PLUGIN_VERSION	= 1.3;
 	const PLUGIN_NAME		= 'BeuCustomConfig';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -149,7 +149,7 @@ class BeuCustomConfig implements CallbackListener, Plugin {
 		]);
 	}
 
-	public function updateSettings(Setting $setting = null) {
+	public function updateSettings(?Setting $setting = null) {
 		if ($setting !== null && $setting->belongsToClass($this)) {
 			$this->changeManiacontrolSettings();
 		}
