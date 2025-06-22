@@ -1156,7 +1156,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					try {
 						$mapInfo = $this->maniaControl->getMapManager()->initializeMap($this->maniaControl->getClient()->getMapInfo($map));
 					} catch (Exception $e) {
-						throw new \Exception("Error with the map " . $map . ": " . $e->getMessage());
+						throw new \Exception('Error with the Map to play "' . $map . '": ' . $e->getMessage());
 					}
 				}
 
@@ -1172,7 +1172,11 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 				// Remove all maps
 				foreach ($this->maniaControl->getMapManager()->getMaps() as $map) {
-					$this->maniaControl->getClient()->removeMap($map->fileName);
+					try {
+						$this->maniaControl->getClient()->removeMap($map->fileName);
+					} catch (Exception $e) {
+						throw new \Exception('Error when removing map "' . $map->getEscapedName() . '" from the playlist: ' . $e->getMessage());
+					}
 				}
 
 				$this->maps = $maps;
