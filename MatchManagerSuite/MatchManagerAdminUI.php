@@ -17,6 +17,7 @@ use ManiaControl\Settings\Setting;
 use ManiaControl\Settings\SettingManager;
 use ManiaControl\Callbacks\TimerListener;
 use ManiaControl\Callbacks\Callbacks;
+use ManiaControl\Logger;
 use ManiaControl\Players\Player;
 use ManiaControl\Players\PlayerManager;
 
@@ -34,6 +35,8 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	const PLUGIN_VERSION									= 2.1;
 	const PLUGIN_NAME										= 'MatchManager Admin UI';
 	const PLUGIN_AUTHOR										= 'Beu';
+
+	const LOG_PREFIX										= '[MatchManagerAdminUI] ';
 
 	const MLID_ADMINUI_SIDEMENU	 							= 'Matchmanager.AdminUI';
 
@@ -122,6 +125,23 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	 */
 	public function unload() {
 		$this->maniaControl->getManialinkManager()->hideManialink(self::MLID_ADMINUI_SIDEMENU);
+	}
+	/**
+	 * Custom log function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function log(mixed $message) {
+		Logger::log(self::LOG_PREFIX . $message);
+	}
+
+	/**
+	 * Custom logError function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function logError(mixed $message) {
+		Logger::logError(self::LOG_PREFIX . $message);
 	}
 
 	/**
@@ -257,12 +277,14 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 
 	public function addMenuItem(MatchManagerAdminUI_MenuItem $menuItem) {
 		$this->removeMenuItem($menuItem->getActionId());
+		$this->log("New Menu Item: ". $menuItem->getActionId());
 		$this->menuItems[] = $menuItem;
 
 		$this->updateManialink = true;
 	}
 
 	public function removeMenuItem(string $actionId) {
+		$this->log("Removing Menu Item: ". $actionId);
 		$this->menuItems = array_filter($this->menuItems, function($menuItem) use ($actionId) {
 			return $menuItem->getActionId() !== $actionId;
 		});
@@ -272,7 +294,7 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 }
 
 class MatchManagerAdminUI_MenuItem {
-	private string $actionId	;
+	private string $actionId;
 	private int $order = 100;
 	private string $description = '';
 	private string $text = '';
