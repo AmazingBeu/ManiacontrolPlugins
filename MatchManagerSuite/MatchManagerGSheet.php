@@ -195,9 +195,9 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 
 		$this->access_token = $this->getSecretSetting("access_token");
 
-		$this->maniaControl->getChat()->sendErrorToAdmins('To use the MatchManagerGSheet plugin, $<$l[https://github.com/AmazingBeu/ManiacontrolPlugins/wiki/MatchManager-GSheet]check the doc$>');
+		$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'To use the MatchManagerGSheet plugin, $<$l[https://github.com/AmazingBeu/ManiacontrolPlugins/wiki/MatchManager-GSheet]check the doc$>');
 		
-		$this->maniaControl->getChat()->sendErrorToAdmins('Since MatchManagerGSheet 2.0, Player names are in the results and no more in a separated list');
+		$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Since MatchManagerGSheet 2.0, Player names are in the results and no more in a separated list');
 
 		$this->updateAdminUIMenuItems();
 
@@ -473,7 +473,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	}
 
 	private function refreshTokenIfNeeded() {
-		$this->Log('refreshTokenIfNeeded');
+		$this->log('Refresh Google API token if needed');
 		$this->access_token = $this->getSecretSetting("access_token");
 		$expire = $this->getSecretSetting("expire");
 		$refreshtoken = $this->getSecretSetting("refresh_token");
@@ -505,6 +505,8 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					$this->access_token = $data->access_token;
 					$this->saveSecretSetting("access_token", $data->access_token);
 					$this->saveSecretSetting("expire", time() + $data->expires_in);
+
+					$this->log('Successfully updated Google API token');
 				} elseif (isset($data->error_description)) {
 					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Google refused the request: ' . $data->error_description);
 				} else {
@@ -670,6 +672,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				}
 
 				if ($this->currentdatamode == "All Rounds Data" && $matchstatus == "running") {
+					$this->log('Successfully sent Info data');
 					$newcurrentscore = [];
 					foreach ($currentscore as $score) {
 						array_push($newcurrentscore, array_merge([$nbmaps, $nbrounds], $score));
@@ -702,10 +705,12 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 							return;
 						}
 
+						$this->log('Successfully appending Player Scores data');
+
 						if (!empty($currentteamsscore)) {
 							$newcurrentteamsscore = [];
 							foreach ($currentteamsscore as $score) {
-								array_push($newcurrentteamsscore,array_merge([$nbmaps, $nbrounds], $score));
+								array_push($newcurrentteamsscore, array_merge([$nbmaps, $nbrounds], $score));
 							}
 
 							$data = new \stdClass;
@@ -734,11 +739,15 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 									$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
 									return;
 								}
+
+								$this->log('Successfully appending Team Scores data');
 							});
 							$asyncHttpRequest->postData(1000);
 						}
 					});
 					$asyncHttpRequest->postData(1000);
+				} else {
+					$this->log('Successfully sent Info and Scores data');
 				}
 			});	
 			$asyncHttpRequest->postData(1000);
@@ -748,12 +757,12 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	}
 
 	function onCallbackEndRound(String $matchid, Array $currentscore, Array $currentteamsscore) {
-		$this->Log('onCallbackEndRound');
+		$this->log('onCallbackEndRound');
 		$this->matchstatus = "running";
 		$this->UpdateGSheetData($matchid, $currentscore, $currentteamsscore);
 	}
 	function onCallbackEndMatch(String $matchid, Array $currentscore, Array $currentteamsscore) {
-		$this->Log('onCallbackEndMatch');
+		$this->log('onCallbackEndMatch');
 		$this->matchstatus = "ended";
 
 		$this->maniaControl->getTimerManager()->registerOneTimeListening($this, function () use ($matchid, $currentscore, $currentteamsscore) {
@@ -761,7 +770,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		}, 1000); // Wait a sec before sending last data to avoid collision
 	}
 	function onCallbackStopMatch(String $matchid, Array $currentscore, Array $currentteamsscore) {
-		$this->Log('onCallbackStopMatch');
+		$this->log('onCallbackStopMatch');
 		$this->matchstatus = "stopped";
 		$this->UpdateGSheetData($matchid, $currentscore, $currentteamsscore);
 	}
@@ -833,7 +842,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			$i = 0;
 
 			if (!$sheetexists) {
-				$this->Log("Creating new Sheet: " . $sheetname);
+				$this->log("Creating new Sheet: " . $sheetname);
 				$sheetid = rand(1000,2147483646);
 				while (in_array($sheetid, $sheetsid)) {
 					$sheetid = rand(1000,2147483646);
@@ -944,6 +953,8 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					return;
 				}
 
+				$this->log('Successfully created sheet with formatting');
+
 				// Clear Scoreboards data
 				$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $spreadsheetid . '/values/' . urlencode("'". $sheetname . "'") . '!A1:Z300:clear');
 				$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
@@ -964,6 +975,8 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 						$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
 						return;
 					}
+
+					$this->log('Successfully cleared all the data');
 
 					// Add headers data
 					$data = new \stdClass;
@@ -1002,6 +1015,8 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 							$this->maniaControl->getChat()->sendErrorToAdmins('$this->MatchManagerCore->getChatPrefix() .Request error: ' . $data->error->code . " ". $data->error->message);
 							return;
 						}
+
+						$this->log('Successfully added headers data');
 					});
 					$asyncHttpRequest->postData(1000);
 				});

@@ -701,9 +701,20 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	/*
 	 * MARK: Internal Functions
 	 */
+	/**
+	 * Custom log function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
 	private function log(mixed $message) {
 		Logger::log(self::LOG_PREFIX . $message);
 	}
+
+	/**
+	 * Custom logError function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
 	private function logError(mixed $message) {
 		Logger::logError(self::LOG_PREFIX . $message);
 	}
@@ -1985,10 +1996,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * @param OnScoresStructure $structure
 	 */
 	public function handleTrackmaniaScore(OnScoresStructure $structure) {
-		$this->log("handleTrackmaniaScore-" . $structure->getSection());
+		$this->log("handleTrackmaniaScore - Section: " . $structure->getSection());
 
 		if ($this->matchStarted && $this->settingsloaded && !$this->postmatch) {
-			$this->log("Section: " . $structure->getSection());
 			if ($structure->getSection() == "EndMatchEarly" || $structure->getSection() == "EndMatch") {
 				$this->computeCurrentScores($structure);
 				$this->MatchEnd();
@@ -1998,6 +2008,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				$this->preendroundscore = $structure;
 			} elseif ($structure->getSection() == "EndRound") {
 				if ($this->nbmaps != 0 && ($this->nbrounds <= $this->settings_nbroundsbymap || $this->settings_nbroundsbymap <= 0)) {
+					$this->log("Computing current scores");
 					$this->computeCurrentScores($structure);
 
 					$timestamp = time();
