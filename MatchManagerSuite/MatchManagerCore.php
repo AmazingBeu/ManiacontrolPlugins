@@ -47,6 +47,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
+	const LOG_PREFIX										= '[MatchManagerCore] ';
+
 	// Specific const
 	const DB_MATCHESINDEX									= 'MatchManager_MatchesIndex';
 	const DB_ROUNDSINDEX									= 'MatchManager_RoundsIndex';
@@ -699,6 +701,12 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	/*
 	 * MARK: Internal Functions
 	 */
+	private function log(mixed $message) {
+		Logger::log(self::LOG_PREFIX . $message);
+	}
+	private function logError(mixed $message) {
+		Logger::logError(self::LOG_PREFIX . $message);
+	}
 
 	/**
 	 * Reset match variables
@@ -706,11 +714,12 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * @param Setting $setting
 	*/
 	public function resetMatchVariables() {
+		$this->log("Reset match variables");
 		$this->matchStarted		= false;
 		$this->matchrecover		= false;
 		$this->pauseon			= false;
 		$this->pointstorecover	= array();
-		$this->currentscore		= array(); // TODO CHECK
+		$this->currentscore		= array();
 		$this->preendroundscore	= null;
 		$this->settingsloaded	= false;
 		$this->mapsshuffled		= false;
@@ -775,7 +784,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$stmt->bind_param('i', $limit);
 
 		if (!$stmt->execute()) {
-			Logger::logError('Error executing MySQL query: '. $stmt->error);
+			$this->logError('Error executing MySQL query: '. $stmt->error);
 		}
 
 		$result = $stmt->get_result();
@@ -813,13 +822,13 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'It\'s not possible to choose to hide or display the maps during a match'); 
 			} else {
 				if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from file') {
-					Logger::log("Load Script Settings");
+					$this->log("Load Script Settings");
 					try {
 						$this->loadGMSettings($this->getGMSettings($this->currentgmbase,$this->currentcustomgm));
-						Logger::log("Parameters updated");
+						$this->log("Parameters updated");
 						$this->maniaControl->getChat()->sendSuccessToAdmins($this->chatprefix . 'Parameters updated');
 					} catch (InvalidArgumentException $e) {
-						Logger::log("Parameters not updated");
+						$this->log("Parameters not updated");
 						$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Parameters not updated');
 					}
 					$this->updateGMvariables();
@@ -844,7 +853,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Unable to find the Post match Maplist file: "' . $setting->value . '"');
 				}
 			} else if ($setting->setting == self::SETTING_MODE_MAPS && $setting->value != "") {
-				$maps = explode(',', $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MODE_MAPS));
+				$maps = explode(',', $setting->value);
 				foreach ($maps as $map) {
 					try {
 						$this->maniaControl->getClient()->getMapInfo($map);
@@ -1012,7 +1021,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					}
 				}
 			} else {
-				Logger::logError("Impossible to read custom gamemode file");
+				$this->logError("Impossible to read custom gamemode file");
 				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " Impossible to read custom gamemode file");
 			}
 		}
@@ -1052,7 +1061,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * Load functionnal variables
 	*/
 	public function updateGMvariables() {
-		Logger::log("Updating internal variables");
+		$this->log("Updating internal variables");
 		$this->currentgmsettings = $this->maniaControl->getClient()->getModeScriptSettings();
 
 		if (isset($this->currentgmsettings[self::SETTING_MATCH_S_POINTSLIMIT])) {
@@ -1137,7 +1146,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 			if  ($this->currentgmbase == "RoyalTimeAttack") {
 				$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
-				Logger::Log("No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
+				$this->log("No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
 			}
 
 			// Prepare maps in case of "All from the plugin" mode
@@ -1182,13 +1191,13 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Match start with script ' . $scriptName . ' (based on ' . $this->currentgmbase . ')');
 				}
 
-				Logger::log("Match start with script " . $scriptName . '!');
+				$this->log("Match start with script " . $scriptName . '!');
 				$this->maniaControl->getClient()->setScriptName($scriptName);
 			}
 
 			// Must be after loading the script in case of different MapType
 			if ($this->currentsettingmode != 'All from the plugin') {
-				Logger::log("Loading maplist + matchsettings");
+				$this->log("Loading maplist + matchsettings");
 				$maplist = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MODE_MAPLIST_FILE);
 				if (empty($maplist)) {
 					$server = $this->maniaControl->getServer()->login;
@@ -1196,7 +1205,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				} else {
 					$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $maplist;
 				}
-				Logger::log("Load matchsettings: " . $maplist);
+				$this->log("Load matchsettings: " . $maplist);
 				if (!is_file($this->maniaControl->getServer()->getDirectory()->getMapsFolder() . $maplist)) {
 					throw new \Exception("The Maplist file is not accessible or does not exist (the match has not started)");
 				}
@@ -1217,17 +1226,17 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				}
 			}
 
-			Logger::log("Restructure maplist");
+			$this->log("Restructure maplist");
 			$this->maniaControl->getMapManager()->restructureMapList();
 
 			$this->matchStarted = true;
 			$this->nbmaps		= 0;
 			$this->nbrounds		= 0;
 
-			Logger::log("Get Players");
+			$this->log("Get Players");
 			$players = $this->maniaControl->getPlayerManager()->getPlayers();
 
-			Logger::log("Player State");
+			$this->log("Player State");
 			foreach ($players as $player) {
 				$this->handlePlayerConnect($player);
 			}
@@ -1242,7 +1251,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$stmt->bind_param('sssi', $this->matchid, $serverlogin, $this->currentgmbase, $timestamp);
 
 			if (!$stmt->execute()) {
-				Logger::logError('Error executing MySQL query: '. $stmt->error);
+				$this->logError('Error executing MySQL query: '. $stmt->error);
 			}
 
 			// Trigger Callback
@@ -1256,12 +1265,12 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_STARTMATCH, $this->matchid, $settings);
 			$this->updateAdminUIMenuItems();
 
-			Logger::log("Skip map");
+			$this->log("Skip map");
 			$this->maniaControl->getMapManager()->getMapActions()->skipMap();
 		} catch (Exception $e) {
 			$this->resetMatchVariables();
-			Logger::log($e->getMessage());
-			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . $e->getMessage());
+			$this->logError("Can't start the match: ". $e->getMessage());
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "Can't start the match: ". $e->getMessage());
 		}
 	}
 
@@ -1284,7 +1293,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					$scriptname = "Trackmania/TM_RoyalTimeAttack_Online.Script.txt" ;
 				}
 				if (isset($scriptname)) {
-					Logger::log("Loading script: " . $scriptname);
+					$this->log("Loading script: " . $scriptname);
 					$this->maniaControl->getClient()->setScriptName($scriptname);
 				}
 			}
@@ -1299,7 +1308,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$stmt->bind_param('is', $timestamp, $this->matchid);
 
 			if (!$stmt->execute()) {
-				Logger::logError('Error executing MySQL query: '. $stmt->error);
+				$this->logError('Error executing MySQL query: '. $stmt->error);
 			}
 
 			// Match Result
@@ -1319,7 +1328,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				list($rank, $login, $matchpoints, $mappoints, $roundpoints, $bestracetime, $bestracecheckpoints, $bestlaptime, $bestlapcheckpoints, $prevracetime, $prevracecheckpoints, $teamid) = $score;
 
 				if (!$stmt->execute()) {
-					Logger::logError('Error executing MySQL query: '. $stmt->error);
+					$this->logError('Error executing MySQL query: '. $stmt->error);
 				}
 			}
 			$stmt->close();
@@ -1335,7 +1344,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					list($rank, $teamid, $teamname, $matchpoints) = $score;
 
 					if (!$stmt->execute()) {
-						Logger::logError('Error executing MySQL query: '. $stmt->error);
+						$this->logError('Error executing MySQL query: '. $stmt->error);
 					}
 				}
 				$stmt->close();
@@ -1347,7 +1356,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 			// End notifications
 			$this->maniaControl->getChat()->sendSuccess($this->chatprefix . "Match finished");
-			Logger::log("Match finished");
+			$this->log("Match finished");
 
 			$this->resetMatchVariables();
 			$this->updateAdminUIMenuItems();
@@ -1356,7 +1365,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$this->currentteamsscore = [];
 
 		} catch (Exception $e) {
-			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Can not finish match: ' . $e->getMessage());
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "Can't finish the match: " . $e->getMessage());
+			$this->logError("Can't finish the match: ". $e->getMessage());
 		}
 	}
 
@@ -1364,7 +1374,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * Function called to stop the match
 	 */
 	public function MatchStop() {
-		Logger::log("Match stop");
+		$this->log("Match stop");
 		if (!$this->matchStarted) {
 			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . " No match launched");
 			return;
@@ -1395,7 +1405,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					$scriptname = "Trackmania/TM_RoyalTimeAttack_Online.Script.txt" ;
 				}
 				if (isset($scriptname)) {
-					Logger::log("Loading script: " . $scriptname);
+					$this->log("Loading script: " . $scriptname);
 					$this->maniaControl->getClient()->setScriptName($scriptname);
 				}
 			}
@@ -1403,9 +1413,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$this->resetMatchVariables();
 			$this->updateAdminUIMenuItems();
 		} catch (Exception $e) {
-			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Can not stop match: ' . $e->getMessage());
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "Can't stop the match: " . $e->getMessage());
+			$this->logError("Can't stop the match: ". $e->getMessage());
 		}
-		Logger::log("Restarting map to load Gamemode");
+		$this->log("Restarting map to load Gamemode");
 		$this->maniaControl->getClient()->restartMap();
 	}
 
@@ -1414,14 +1425,14 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * @param integer $index
 	 */
 	public function MatchRecover(int $index): bool {
-		Logger::log("Match Recover");
+		$this->log("Match Recover");
 
 		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
 		$stmt = $mysqli->prepare('SELECT `matchid`,`gamemodebase` FROM `' . self::DB_MATCHESINDEX . '` ORDER BY `started` DESC LIMIT ? , 1');
 		$stmt->bind_param('i', $index);
 
 		if (!$stmt->execute()) {
-			Logger::logError('Error executing MySQL query: '. $stmt->error);
+			$this->logError('Error executing MySQL query: '. $stmt->error);
 			return false;
 		}
 		$result = $stmt->get_result();
@@ -1438,7 +1449,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$stmt->bind_param('s', $matchid);
 
 			if (!$stmt->execute()) {
-				Logger::logError('Error executing MySQL query: '. $stmt->error);
+				$this->logError('Error executing MySQL query: '. $stmt->error);
 				return false;
 			}
 			$result = $stmt->get_result();
@@ -1460,7 +1471,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				$stmt->bind_param('si', $matchid, $timestamp);
 
 				if (!$stmt->execute()) {
-					Logger::logError('Error executing MySQL query: '. $stmt->error);
+					$this->logError('Error executing MySQL query: '. $stmt->error);
 					return false;
 				}
 
@@ -1477,7 +1488,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						}
 					}
 					$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Recovering the match: ' . $matchid );
-					Logger::log('Recovering the match: ' . $matchid);
+					$this->log('Recovering the match: ' . $matchid);
 					$this->MatchStart();
 					return true;
 				} else {
@@ -1505,7 +1516,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				// Red Team
 				$this->maniaControl->getModeScriptEventManager()->setTrackmaniaTeamPoints("1", "", $this->pointstorecover[1], $this->pointstorecover[1]);
 				$this->maniaControl->getChat()->sendSuccess($this->chatprefix . '$<$ff0' . $this->pointstorecover[1] . '$> points recovered for the $<$f00Red$> Team');
-				Logger::log("Point recovered: Blue " . $this->pointstorecover[0] . " - Red " . $this->pointstorecover[1]);
+				$this->log("Point recovered: Blue " . $this->pointstorecover[0] . " - Red " . $this->pointstorecover[1]);
 				$this->pointstorecover = [];
 			} else {
 				foreach ($this->pointstorecover as $index => $value) {
@@ -1524,7 +1535,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						$this->maniaControl->getModeScriptEventManager()->setTrackmaniaPlayerPoints($player, "", "", $points);
 						$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'Your $<$ff0' . $value . '$> points have been recovered', $player);
 						unset($this->pointstorecover[$index]);
-						Logger::log("Point recovered: " . $index . " " . $points . "(+" . $value . ")");
+						$this->log("Point recovered: " . $index . " " . $points . "(+" . $value . ")");
 					}
 				}
 			}
@@ -1546,7 +1557,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 		if  ($this->currentgmbase == "RoyalTimeAttack") {
 			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
-			Logger::Log("No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
+			$this->logError("No data are save in RoyalTimeAttack for the moment, it's not implemented on server side. Waiting a fix from NADEO");
 		}
 
 		$preendroundplayersscore = [];
@@ -1645,10 +1656,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	public function setNadeoPause($admin = false, $time = null) {
 		if ($this->pauseon) {
 			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . 'Can\'t launch pause, already running');
-			Logger::logError('Can\'t launch pause, already running');
+			$this->logError('Can\'t launch pause, already running');
 			return;
 		}
-		Logger::log("Launching Pause");
+		$this->log("Launching Pause");
 
 		if ($time === null) {
 			$this->pausetimer = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_PAUSE_DURATION);
@@ -1674,7 +1685,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 */
 	private function unsetNadeoPause() {
 		if ($this->pauseon) {
-			Logger::log("End Pause");
+			$this->log("End Pause");
 			$this->closePauseWidget();
 			$this->pauseon = false;
 			$this->maniaControl->getModeScriptEventManager()->endPause();
@@ -1765,14 +1776,14 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * Handle XMLRPC callback "Maniaplanet.StartMatch_Start"
 	 */
 	public function handleStartMatchStartCallback() {
-		Logger::log("handleStartMatchStartCallback");
+		$this->log("handleStartMatchStartCallback");
 
 		if ($this->matchStarted) {
-			Logger::log("Loading settings");
+			$this->log("Loading settings");
 			$this->settingsloaded = true;
 
 			if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from file') {
-				Logger::log("Load Script Settings");
+				$this->log("Load Script Settings");
 				$this->loadGMSettings($this->getGMSettings($this->currentgmbase, $this->currentcustomgm));
 			}
 
@@ -1780,7 +1791,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		} else if ($this->postmatch) {
 			$this->postmatch = false;
 
-			Logger::log("Load PostMatch Gamemode Settings");
+			$this->log("Load PostMatch Gamemode Settings");
 			$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_POST_MATCH_MAPLIST);
 			if (is_file($this->maniaControl->getServer()->getDirectory()->getMapsFolder() . $maplist)) {
 				$this->maniaControl->getClient()->loadMatchSettings($maplist);
@@ -1807,18 +1818,18 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * Handle Maniacontrol callback "BeginMatch"
 	 */
 	public function handleBeginMatchCallback() {
-		Logger::log("handleBeginMatchCallback");
+		$this->log("handleBeginMatchCallback");
 		if ($this->matchStarted && !$this->settingsloaded) {
-			Logger::log("Restarting map to restart match data");
+			$this->log("Restarting map to restart match data");
 			$this->maniaControl->getClient()->restartMap();
 		} else if ($this->matchStarted && $this->settingsloaded && $this->nbrounds == 0) {
-			Logger::Log("Check if Points Repartition need to be re-applied");
+			$this->log("Check if Points Repartition need to be re-applied");
 			$this->maniaControl->getModeScriptEventManager()->getTrackmaniaPointsRepartition()->setCallable(function (OnPointsRepartitionStructure $structure) {
 				$currentgmsettings = $this->maniaControl->getClient()->getModeScriptSettings();
 				if (!is_null($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_S_POINTSREPARTITION)) && isset($currentgmsettings[self::SETTING_MATCH_S_POINTSREPARTITION])) {
 					$pointrepartitionarray = explode(",", $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_S_POINTSREPARTITION));
 					if ($structure->getPointsRepartition() != $pointrepartitionarray) {
-						Logger::Log("re-applying Points Repartition for workaround");
+						$this->log("re-applying Points Repartition for workaround");
 						$newpoints = array(self::SETTING_MATCH_S_POINTSREPARTITION => $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_S_POINTSREPARTITION) . ',' . end($pointrepartitionarray));
 						$this->maniaControl->getClient()->setModeScriptSettings($newpoints);
 					}
@@ -1831,7 +1842,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * Handle Maniacontrol callback "BeginMap"
 	 */
 	public function handleBeginMapCallback() {
-		Logger::log("handleBeginMapCallback");
+		$this->log("handleBeginMapCallback");
 		if ($this->matchStarted) {
 			$this->nbmaps++;
 			$this->nbrounds = 0;
@@ -1841,7 +1852,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				$totalnbmaps = $this->maniaControl->getMapManager()->getMapsCount();
 
 				$this->currentmap = $this->maniaControl->getMapManager()->getCurrentMap();
-				Logger::log("Current Map: " . Formatter::stripCodes($this->currentmap->name));
+				$this->log("Current Map: " . Formatter::stripCodes($this->currentmap->name));
 				$message = $this->chatprefix . '$<$o$iCurrent Map:$>' . "\n";
 				$message .= Formatter::stripCodes($this->currentmap->name);
 				$this->maniaControl->getChat()->sendInformation($message);
@@ -1867,7 +1878,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 									$nbhiddenmaps = count($this->maps) - $totalnbmaps;
 								}
 								$message .= "\nThen " . $nbhiddenmaps . " hidden maps";
-								Logger::log("Then " . $nbhiddenmaps . " hidden maps");
+								$this->log("Then " . $nbhiddenmaps . " hidden maps");
 							}
 						}
 
@@ -1880,10 +1891,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 							if ($index != $i) {
 								$message .= "\n" . $j . ": " . Formatter::stripCodes($maps[$index]->name);
-								Logger::log(Formatter::stripCodes($index . ": " . $maps[$index]->name));
+								$this->log(Formatter::stripCodes($index . ": " . $maps[$index]->name));
 							} else {
 								$message .= "\nThen we will return to this map";
-								Logger::log("Then we will return to this map");
+								$this->log("Then we will return to this map");
 								$j = 0;
 								break;
 							}
@@ -1891,11 +1902,11 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						if ($j + $nbhiddenmaps >= 4) {
 							if ($this->settings_nbmapsbymatch > 0 && $this->settings_nbmapsbymatch - $j - $nbhiddenmaps - $this->nbmaps + 1 > 0) {
 								$message .= "\n" . "And " . ($this->settings_nbmapsbymatch - $j - $nbhiddenmaps - $this->nbmaps + 1) . " more maps";
-								Logger::log("And " . ($this->settings_nbmapsbymatch - $j - $nbhiddenmaps - $this->nbmaps + 1) . " more maps");
+								$this->log("And " . ($this->settings_nbmapsbymatch - $j - $nbhiddenmaps - $this->nbmaps + 1) . " more maps");
 							} elseif ($this->settings_nbmapsbymatch <= 0 && ($totalnbmaps - $j - $nbhiddenmaps > 0 || count($this->maps) - $j - $nbhiddenmaps > 0)) {
 								$n = max($totalnbmaps - $j - $nbhiddenmaps, count($this->maps) - $j - $nbhiddenmaps);
 								$message .= "\n" . "And " . $n . " more maps";
-								Logger::log("And " . $n . " more maps");
+								$this->log("And " . $n . " more maps");
 							}
 						}
 						$this->maniaControl->getChat()->sendInformation($message);
@@ -1915,7 +1926,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * Handle callback "WarmUp.StartRound"
 	 */
 	public function handleStartWarmUpCallback() {
-		Logger::log("handleStartWarmUpCallback");
+		$this->log("handleStartWarmUpCallback");
 
 		// Match Recover
 		if ($this->matchrecover) {
@@ -1927,7 +1938,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * Handle callback "BeginRound"
 	 */
 	public function handleBeginRoundCallback(StartEndStructure $structure) {
-		Logger::log("handleBeginRoundCallback");
+		$this->log("handleBeginRoundCallback");
 
 		if ($this->matchStarted && $this->nbmaps > 0) {
 
@@ -1943,11 +1954,11 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				$this->maniaControl->getModeScriptEventManager()->getPauseStatus()->setCallable(function (StatusCallbackStructure $structure) {
 					if ($structure->getActive()) {
 						$this->maniaControl->getChat()->sendSuccess($this->chatprefix . 'The match is currently on $<$F00pause$>!');
-						Logger::log("Pause");
+						$this->log("Pause");
 					} else {
 						if ($this->settings_nbroundsbymap > 1) {
 							$this->maniaControl->getChat()->sendInformation($this->chatprefix . '$o$iRound: ' . $this->nbrounds . ' / ' . $this->settings_nbroundsbymap);
-							Logger::log("Round: " . $this->nbrounds . ' / ' . $this->settings_nbroundsbymap);
+							$this->log("Round: " . $this->nbrounds . ' / ' . $this->settings_nbroundsbymap);
 						}
 					}
 				});
@@ -1967,10 +1978,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * @param OnScoresStructure $structure
 	 */
 	public function handleTrackmaniaScore(OnScoresStructure $structure) {
-		Logger::log("handleTrackmaniaScore-" . $structure->getSection());
+		$this->log("handleTrackmaniaScore-" . $structure->getSection());
 
 		if ($this->matchStarted && $this->settingsloaded && !$this->postmatch) {
-			Logger::log("Section: " . $structure->getSection());
+			$this->log("Section: " . $structure->getSection());
 			if ($structure->getSection() == "EndMatchEarly" || $structure->getSection() == "EndMatch") {
 				$this->computeCurrentScores($structure);
 				$this->MatchEnd();
@@ -1996,7 +2007,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
 					$stmt->bind_param('siiissii', $this->matchid, $timestamp, $this->nbmaps, $this->nbrounds, $settings, $this->currentmap->uid, $playercount, $spectatorcount);
 					if (!$stmt->execute()) {
-						Logger::logError('Error executing MySQL query: '. $stmt->error);
+						$this->logError('Error executing MySQL query: '. $stmt->error);
 					}
 					$stmt->close();
 
@@ -2025,7 +2036,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 						list($rank, $login, $matchpoints, $mappoints, $roundpoints, $bestracetime, $bestracecheckpoints, $bestlaptime, $bestlapcheckpoints, $prevracetime, $prevracecheckpoints, $teamid) = $score;
 
 						if (!$stmt->execute()) {
-							Logger::logError('Error executing MySQL query: '. $stmt->error);
+							$this->logError('Error executing MySQL query: '. $stmt->error);
 						}
 					}
 					$stmt->close();
@@ -2041,14 +2052,14 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 							list($rank, $teamid, $teamname, $matchpoints, $mappoints, $roundpoints) = $score;
 
 							if (!$stmt->execute()) {
-								Logger::logError('Error executing MySQL query: '. $stmt->error);
+								$this->logError('Error executing MySQL query: '. $stmt->error);
 							}
 						}
 						$stmt->close();
 					}
 					$mysqli->commit();
 
-					Logger::log("Rounds finished: " . $this->nbrounds);
+					$this->log("Rounds finished: " . $this->nbrounds);
 					$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_ENDROUND, $this->matchid, $this->currentscore, $this->currentteamsscore);
 				}
 			}
@@ -2175,7 +2186,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * @param \ManiaControl\Players\Player $player
 	*/
 	public function onCommandSetPause(array $chatCallback, Player $player) {
-		Logger::log("Pause asked by admin");
+		$this->log("Pause asked by admin");
 		$authLevel = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_AUTHLEVEL);
 		if (!$this->maniaControl->getAuthenticationManager()->checkRight($player, AuthenticationManager::getAuthLevel($authLevel))) {
 			$this->maniaControl->getAuthenticationManager()->sendNotAllowed($player);
@@ -2284,7 +2295,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$stmt->bind_param('s', $target);
 
 		if (!$stmt->execute()) {
-			Logger::logError('Error executing MySQL query: '. $stmt->error);
+			$this->logError('Error executing MySQL query: '. $stmt->error);
 		}
 
 		$result = $stmt->get_result();
