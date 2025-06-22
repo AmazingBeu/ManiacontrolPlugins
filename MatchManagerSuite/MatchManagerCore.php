@@ -715,19 +715,20 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	*/
 	public function resetMatchVariables() {
 		$this->log("Reset match variables");
-		$this->matchStarted		= false;
-		$this->matchrecover		= false;
-		$this->pauseon			= false;
-		$this->pointstorecover	= array();
-		$this->currentscore		= array();
-		$this->preendroundscore	= null;
-		$this->settingsloaded	= false;
-		$this->mapsshuffled		= false;
-		$this->mapshidden		= false;
-		$this->hidenextmaps		= false;
-		$this->maps				= array();
-		$this->postmatch		= true;
-		$this->matchid			= "";
+		$this->matchStarted		 = false;
+		$this->matchrecover		 = false;
+		$this->pauseon			 = false;
+		$this->pointstorecover	 = array();
+		$this->currentscore		 = array();
+		$this->currentteamsscore = array();
+		$this->preendroundscore	 = null;
+		$this->settingsloaded	 = false;
+		$this->mapsshuffled		 = false;
+		$this->mapshidden		 = false;
+		$this->hidenextmaps		 = false;
+		$this->maps				 = array();
+		$this->postmatch		 = false;
+		$this->matchid			 = "";
 
 		$this->settings_nbroundsbymap	= -1;
 		$this->settings_nbwinners		= 2;
@@ -1138,6 +1139,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		if (!$this->canStartMatch()) return;
 
 		try {
+			$this->resetMatchVariables();
+
 			$this->matchid = $this->maniaControl->getServer()->login . "-" . time();
 			$this->currentgmbase = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_GAMEMODE_BASE);
 			$this->currentcustomgm = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE);
@@ -1363,11 +1366,9 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$this->log("Match finished");
 
 			$this->resetMatchVariables();
+			$this->postmatch = true;
+
 			$this->updateAdminUIMenuItems();
-
-			// Teams Specifics variables
-			$this->currentteamsscore = [];
-
 		} catch (Exception $e) {
 			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "Can't finish the match: " . $e->getMessage());
 			$this->logError("Can't finish the match: ". $e->getMessage());
@@ -1415,6 +1416,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			}
 
 			$this->resetMatchVariables();
+			$this->postmatch = true;
+
 			$this->updateAdminUIMenuItems();
 		} catch (Exception $e) {
 			$this->maniaControl->getChat()->sendErrorToAdmins($this->chatprefix . "Can't stop the match: " . $e->getMessage());
