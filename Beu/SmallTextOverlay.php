@@ -26,7 +26,7 @@ class SmallTextOverlay implements TimerListener, CallbackListener, Plugin {
 	* Constants
 	*/
 	const PLUGIN_ID			= 195;
-	const PLUGIN_VERSION	= 1.1;
+	const PLUGIN_VERSION	= 1.4;
 	const PLUGIN_NAME		= 'SmallTextOverlay';
 	const PLUGIN_AUTHOR		= 'Beu';
 
