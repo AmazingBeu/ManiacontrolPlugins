@@ -32,7 +32,7 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	 * Constants
 	 */
 	const PLUGIN_ID											= 174;
-	const PLUGIN_VERSION									= 2.2;
+	const PLUGIN_VERSION									= 2.3;
 	const PLUGIN_NAME										= 'MatchManager Admin UI';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -198,6 +198,8 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	 * @return void
 	 */
 	public function generateManialink() {
+		$this->log("Generating interface with ". count($this->menuItems) . " items");
+
 		$quadStyle         = $this->maniaControl->getManialinkManager()->getStyleManager()->getDefaultQuadStyle();
 		$quadSubstyle      = $this->maniaControl->getManialinkManager()->getStyleManager()->getDefaultQuadSubstyle();
 		$itemMarginFactorX = 1.3;
@@ -277,14 +279,12 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 
 	public function addMenuItem(MatchManagerAdminUI_MenuItem $menuItem) {
 		$this->removeMenuItem($menuItem->getActionId());
-		$this->log("New Menu Item: ". $menuItem->getActionId());
 		$this->menuItems[] = $menuItem;
 
 		$this->updateManialink = true;
 	}
 
 	public function removeMenuItem(string $actionId) {
-		$this->log("Removing Menu Item: ". $actionId);
 		$this->menuItems = array_filter($this->menuItems, function($menuItem) use ($actionId) {
 			return $menuItem->getActionId() !== $actionId;
 		});
