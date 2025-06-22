@@ -1198,6 +1198,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			}
 
 			// Define Gamemode
+			$scriptName = '-';
 			if ($this->currentsettingmode != 'All from file') {
 				if (empty($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_CUSTOM_GAMEMODE))) {
 					$scriptName = "Trackmania/TM_" ;
@@ -1304,7 +1305,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_POST_MATCH_MAPLIST);
 			if (is_file($this->maniaControl->getServer()->getDirectory()->getMapsFolder() . $maplist)) {
 				$this->maniaControl->getClient()->loadMatchSettings($maplist);
-			} else {
+			} else if ($this->currentmap !== null) {
 				if ($this->currentmap->mapType == "TrackMania\TM_Race") {
 					$scriptname = "Trackmania/TM_TimeAttack_Online.Script.txt" ;
 				} else if ($this->currentmap->mapType == "TrackMania\TM_Royal") {
@@ -1414,7 +1415,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$maplist = 'MatchSettings' . DIRECTORY_SEPARATOR . $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_POST_MATCH_MAPLIST);
 			if (is_file($this->maniaControl->getServer()->getDirectory()->getMapsFolder() . $maplist)) {
 				$this->maniaControl->getClient()->loadMatchSettings($maplist);
-			} else {
+			} else if ($this->currentmap !== null) {
 				if ($this->currentmap->mapType == "TrackMania\TM_Race") {
 					$scriptname = "Trackmania/TM_TimeAttack_Online.Script.txt" ;
 				} else if ($this->currentmap->mapType == "TrackMania\TM_Royal") {
