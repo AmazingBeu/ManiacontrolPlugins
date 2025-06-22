@@ -27,8 +27,8 @@ use ManiaControl\Commands\CommandListener;
 use ManiaControl\Plugins\PluginMenu;
 
 if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
-	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
-	Logger::logError('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
+	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use MatchManagerMultipleConfigManager plugin. Install it and restart Maniacontrol');
+	Logger::logError('MatchManager Core is required to use MatchManagerMultipleConfigManager plugin. Install it and restart Maniacontrol');
 	return false;
 }
 use MatchManagerSuite\MatchManagerCore;
@@ -47,6 +47,9 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	const PLUGIN_VERSION									= 1.6;
 	const PLUGIN_NAME										= 'MatchManager Multiple Config Manager';
 	const PLUGIN_AUTHOR										= 'Beu';
+
+	const LOG_PREFIX										= '[MatchManagerMultipleConfigManager] ';
+
 
 	// MatchManagerWidget Properties
 	const MATCHMANAGERCORE_PLUGIN							= 'MatchManagerSuite\MatchManagerCore';
@@ -71,6 +74,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 */
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl 			= null;
+	/** @var MatchManagerCore $MatchManagerCore */
 	private $MatchManagerCore		= null;
 
 	/**
@@ -153,6 +157,24 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	}
 
 	/**
+	 * Custom log function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function log(mixed $message) {
+		Logger::log(self::LOG_PREFIX . $message);
+	}
+
+	/**
+	 * Custom logError function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function logError(mixed $message) {
+		Logger::logError(self::LOG_PREFIX . $message);
+	}
+
+	/**
 	 * handle Plugin Loaded
 	 * 
 	 * @param string $pluginClass 
@@ -182,7 +204,8 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
 		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
 			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
-			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
+			$this->log(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
+			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class($this)));
 		}
 	}
 
@@ -248,7 +271,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 				break;
 			case self::ML_ACTION_REMOVE_CONFIG:
 				$id = intval($actionArray[2]);
-				Logger::log("[MatchManagerMultipleConfigManager] Removing config: " . $id);
+				$this->log("Removing config: " . $id);
 				$mysqli = $this->maniaControl->getDatabase()->getMysqli();
 
 				$query = $mysqli->prepare('DELETE FROM  `'. self::DB_MATCHCONFIG .'` WHERE id = ?;');
@@ -288,8 +311,8 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 */
 	public function loadConfig(int $id) {
 		if ($this->MatchManagerCore->getMatchStatus()) {
-			Logger::logError("Impossible to load config during a match");
-			$this->maniaControl->getChat()->sendErrorToAdmins('Impossible to load config during a match');
+			$this->logError("Impossible to load config during a match");
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Impossible to load config during a match');
 			return;
 		}
 		$mysqli = $this->maniaControl->getDatabase()->getMysqli();
@@ -310,7 +333,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 		if ($result[0] && $result[0]["config"]) {
 			$allconfigs = json_decode($result[0]["config"],true);
 			if ($allconfigs != null) {
-				Logger::log("[MatchManagerMultipleConfigManager] Loading config: " . $id);
+				$this->log("Loading config: " . $id);
 				$someconfignotloaded = false;
 				foreach ($allconfigs as $plugin => $configs) {
 					$pluginclass = $this->maniaControl->getPluginManager()->getPlugin($plugin);
@@ -321,22 +344,22 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 							$setting = $this->maniaControl->getSettingManager()->getSettingObject($pluginclass, $name);
 							if ($setting != null) {
 								if ($setting->value != $value) {
-									Logger::log("Saving new setting " . $name);
+									$this->log("Saving new setting " . $name);
 									$setting->value = $value;
 									$this->maniaControl->getSettingManager()->saveSetting($setting);
 								}
 							} else {
 								$someconfignotloaded = true;
-								Logger::log("Unable to load setting: " . $name);
+								$this->log("Unable to load setting: " . $name);
 							}
 						}
 					}
 				}
 				if ($someconfignotloaded) {
-					$this->maniaControl->getChat()->sendErrorToAdmins('One or more settings could not be imported');
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'One or more settings could not be imported');
 				}
 				$this->maniaControl->getSettingManager()->clearStorage();
-				$this->maniaControl->getChat()->sendSuccessToAdmins('MatchManager Config "' . $result[0]["name"] . '" loaded');
+				$this->maniaControl->getChat()->sendSuccessToAdmins($this->MatchManagerCore->getChatPrefix() .'MatchManager Config "' . $result[0]["name"] . '" loaded');
 			}
 		}
 
@@ -350,7 +373,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 * @return void
 	 */
 	public function saveCurrentConfig(array $fields) {
-		Logger::log("[MatchManagerMultipleConfigManager] Saving current config");
+		$this->log("Saving current config");
 		$result = array();
 		$configname = "";
 		$gamemodebase = "";

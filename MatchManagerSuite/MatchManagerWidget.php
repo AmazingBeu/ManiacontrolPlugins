@@ -20,8 +20,8 @@ use ManiaControl\Settings\Setting;
 use ManiaControl\Settings\SettingManager;
 
 if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
-	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
-	Logger::logError('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
+	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use MatchManagerWidget plugin. Install it and restart Maniacontrol');
+	$this->logError('MatchManager Core is required to use MatchManagerWidget plugin. Install it and restart Maniacontrol');
 	return false;
 }
 use MatchManagerSuite\MatchManagerCore;
@@ -41,6 +41,8 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	const PLUGIN_VERSION									= 1.8;
 	const PLUGIN_NAME										= 'MatchManager Widget';
 	const PLUGIN_AUTHOR										= 'Beu';
+
+	const LOG_PREFIX										= '[MatchManagerWidget] ';
 
 	// MatchManagerWidget Properties
 	const MATCHMANAGERWIDGET_COMPATIBLE_GM					= ["Cup", "Teams", "Rounds"];
@@ -64,6 +66,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 */
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl 			= null;
+	/** @var MatchManagerCore $MatchManagerCore */
 	private $MatchManagerCore		= null;
 	private $gmbase					= "";
 	private $manialinkData			= null;
@@ -172,6 +175,24 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	}
 
 	/**
+	 * Custom log function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function log(mixed $message) {
+		Logger::log(self::LOG_PREFIX . $message);
+	}
+
+	/**
+	 * Custom logError function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function logError(mixed $message) {
+		Logger::logError(self::LOG_PREFIX . $message);
+	}
+
+	/**
 	 * handlePluginUnloaded
 	 *
 	 * @param  string $pluginClass
@@ -181,7 +202,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
 		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
 			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
-			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
+			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class($this)));
 		}
 	}
 
@@ -215,7 +236,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 * @param array $settings
 	 */
 	public function InitMatch(string $matchid, array $settings) {
-		Logger::Log("InitMatch");
+		$this->log("InitMatch");
 		$this->gmbase = $settings['currentgmbase'];
 		$this->displayManialinks(false);
 	}
@@ -224,7 +245,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 * Clear variables and hide widget
 	 */
 	public function ClearMatch() {
-		Logger::Log("ClearMatch");
+		$this->log("ClearMatch");
 		$this->gmbase = "";
 		$this->manialinkData = "";
 		$this->closeWidgets();
@@ -295,7 +316,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 * @param Player $player
 	 */
 	public function handlePlayerConnect(Player $player) {
-		Logger::Log("handlePlayerConnect");
+		$this->log("handlePlayerConnect");
 
 		if (strlen($this->gmbase) > 0) {
 			$this->displayManialinks($player->login);
@@ -405,7 +426,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 * Generate the manilink of the background of the widget
 	 */
 	public function generateMatchLiveWidgetBackground() {
-		Logger::Log("generateMatchLiveWidgetBackground");
+		$this->log("generateMatchLiveWidgetBackground");
 
 		$posX       = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERWIDGET_LIVE_POSX);
 		$posY       = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERWIDGET_LIVE_POSY);
@@ -448,7 +469,7 @@ class MatchManagerWidget implements ManialinkPageAnswerListener, CallbackListene
 	 * @param array $currentscore
 	 */
 	public function generateMatchLiveWidgetData(array $currentscore) {
-		Logger::Log("generateMatchLiveWidgetData");
+		$this->log("generateMatchLiveWidgetData");
 
 		if ($this->gmbase == "Cup") {
 			$pointlimit = $this->MatchManagerCore->getMatchPointsLimit();

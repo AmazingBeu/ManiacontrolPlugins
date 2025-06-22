@@ -12,8 +12,8 @@ use ManiaControl\Settings\SettingManager;
 use ManiaControl\Callbacks\TimerListener;
 
 if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
-	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
-	Logger::logError('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
+	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use MatchManagerAutomaticLauncher plugin. Install it and restart Maniacontrol');
+	Logger::logError('MatchManager Core is required to use MatchManagerAutomaticLauncher plugin. Install it and restart Maniacontrol');
 	return false;
 }
 
@@ -42,6 +42,7 @@ class MatchManagerAutomaticLauncher implements CallbackListener, TimerListener, 
 	 */
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl 			= null;
+	/** @var MatchManagerCore $MatchManagerCore */
 	private $MatchManagerCore		= null;
 
 
@@ -101,7 +102,7 @@ class MatchManagerAutomaticLauncher implements CallbackListener, TimerListener, 
 				$this->MatchManagerCore = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERCORE_PLUGIN);
 				if ($this->MatchManagerCore == null) {
 					$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is needed to use ' . self::PLUGIN_NAME . ' plugin.');
-					$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
+					$this->maniaControl->getPluginManager()->deactivatePlugin((get_class($this)));
 				} else {
 					$this->createTimers();
 				}
@@ -146,7 +147,7 @@ class MatchManagerAutomaticLauncher implements CallbackListener, TimerListener, 
 	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
 		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
 			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
-			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
+			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class($this)));
 		}
 	}
 	
@@ -170,6 +171,6 @@ class MatchManagerAutomaticLauncher implements CallbackListener, TimerListener, 
 				$newtimers++;
 			}
 		}
-		$this->maniaControl->getChat()->sendSuccessToAdmins($newtimers . " matches are planned");
+		$this->maniaControl->getChat()->sendSuccessToAdmins($this->MatchManagerCore->getChatPrefix() . $newtimers . " matches are planned");
 	}
 }

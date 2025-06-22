@@ -37,6 +37,8 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 	const PLUGIN_NAME		= 'MatchManager eCircuitMania';
 	const PLUGIN_AUTHOR		= 'Beu';
 
+	const LOG_PREFIX					= '[MatchManagerECircuitMania] ';
+
 	const MATCHMANAGERCORE_PLUGIN		= 'MatchManagerSuite\MatchManagerCore';
 	const MATCHMANAGERADMINUI_PLUGIN	= 'MatchManagerSuite\MatchManagerAdminUI';
 
@@ -108,7 +110,7 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 				$this->MatchManagerCore = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERCORE_PLUGIN);
 				if ($this->MatchManagerCore === null) {
 					$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is needed to use ' . self::PLUGIN_NAME . ' plugin.');
-					$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
+					$this->maniaControl->getPluginManager()->deactivatePlugin((get_class($this)));
 					return;
 				}
 
@@ -128,6 +130,24 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_URL, "https://us-central1-fantasy-trackmania.cloudfunctions.net", "", 10);
 
 		$this->maniaControl->getManialinkManager()->registerManialinkPageAnswerListener(self::ML_ACTION_OPENSETTINGS, $this, 'handleActionOpenSettings');
+	}
+
+	/**
+	 * Custom log function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function log(mixed $message) {
+		Logger::log(self::LOG_PREFIX . $message);
+	}
+
+	/**
+	 * Custom logError function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function logError(mixed $message) {
+		Logger::logError(self::LOG_PREFIX . $message);
 	}
 
 	/**
@@ -214,7 +234,7 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 		if ($request !== null) {
 			$request->setContent($payload)->setCallable(function ($content, $error, $headers) use ($payload) {
 				if ($content !== "Created" || $error !== null) {
-					Logger::logWarning("Error on the 'addRoundTime' request. answer: " . $content . " / error: " . $error . " / payload: " . $payload);
+					$this->logError("Error on the 'addRoundTime' request. answer: " . $content . " / error: " . $error . " / payload: " . $payload);
 				}
 			})->postData();
 		}
@@ -226,7 +246,6 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 
 		$scores = [];
 		foreach ($structure->getPlayerScores() as $playerscore) {
-			if ($playerscore->getMatchPoints() <= -2000) continue;
 			$scores[] = $playerscore;
 		}
 
@@ -284,7 +303,7 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 		if ($request !== null) {
 			$request->setContent($payload)->setCallable(function ($content, $error, $headers) use ($payload) {
 				if ($content !== "Created" || $error !== null) {
-					Logger::logWarning("Error on the 'addRound' request. answer: " . $content . " / error: " . $error . " / payload: " . $payload);
+					$this->logError("Error on the 'addRound' request. answer: " . $content . " / error: " . $error . " / payload: " . $payload);
 				}
 			})->postData();
 		}
@@ -304,7 +323,7 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 		if ($request !== null) {
 			$request->setContent($payload)->setCallable(function ($content, $error, $headers) use ($payload) {
 				if ($content !== "Created" || $error !== null) {
-					Logger::logWarning("Error on the 'removeRound' request. answer: " . $content . " / error: " . $error . " / payload: " . $payload);
+					$this->logError("Error on the 'removeRound' request. answer: " . $content . " / error: " . $error . " / payload: " . $payload);
 				}
 			})->postData();
 		}

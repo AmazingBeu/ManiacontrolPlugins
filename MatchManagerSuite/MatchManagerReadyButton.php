@@ -20,8 +20,8 @@ use ManiaControl\Commands\CommandListener;
 use Maniaplanet\DedicatedServer\InvalidArgumentException;
 
 if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
-	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
-	Logger::logError('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
+	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use MatchManagerReadyButton plugin. Install it and restart Maniacontrol');
+	Logger::logError('MatchManager Core is required to use MatchManagerReadyButton plugin. Install it and restart Maniacontrol');
 	return false;
 }
 
@@ -41,6 +41,8 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	const PLUGIN_NAME										= 'MatchManager Ready Button';
 	const PLUGIN_AUTHOR										= 'Beu';
 
+	const LOG_PREFIX										= '[MatchManagerReadyButton] ';
+
 	// MatchManagerWidget Properties
 	const MATCHMANAGERCORE_PLUGIN							= 'MatchManagerSuite\MatchManagerCore';
 
@@ -57,6 +59,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 */
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl 			= null;
+	/** @var MatchManagerCore $MatchManagerCore */
 	private $MatchManagerCore		= null;
 
 	private $playersreadystate		= array();
@@ -155,6 +158,24 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	}
 
 	/**
+	 * Custom log function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function log(mixed $message) {
+		Logger::log(self::LOG_PREFIX . $message);
+	}
+
+	/**
+	 * Custom logError function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function logError(mixed $message) {
+		Logger::logError(self::LOG_PREFIX . $message);
+	}
+
+	/**
 	 * handlePluginUnloaded
 	 *
 	 * @param  string $pluginClass
@@ -164,7 +185,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
 		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
 			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
-			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
+			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class($this)));
 		}
 	}
 
@@ -205,7 +226,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 				if ($nbready >= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_READY_NBPLAYERS)) {
 					$this->playersreadystate = array();
 					$this->closeReadyWidget();
-					Logger::log('Start Match via Ready Button');
+					$this->log('Start Match via Ready Button');
 					$this->MatchManagerCore->MatchStart();
 					return;
 				}

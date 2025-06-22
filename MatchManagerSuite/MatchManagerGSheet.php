@@ -21,8 +21,8 @@ use ManiaControl\Plugins\PluginMenu;
 use ManiaControl\Utils\WebReader;
 
 if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
-	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
-	Logger::logError('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
+	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use MatchManagerGSheet plugin. Install it and restart Maniacontrol');
+	Logger::logError('MatchManager Core is required to use MatchManagerGSheet plugin. Install it and restart Maniacontrol');
 	return false;
 }
 use MatchManagerSuite\MatchManagerCore;
@@ -42,6 +42,8 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	const PLUGIN_VERSION									= 2.3;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
+
+	const LOG_PREFIX										= '[MatchManagerGSheet] ';
 
 	// Other MatchManager plugin
 	const MATCHMANAGERADMINUI_PLUGIN						= 'MatchManagerSuite\MatchManagerAdminUI';
@@ -214,6 +216,24 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	}
 
 	/**
+	 * Custom log function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function log(mixed $message) {
+		Logger::log(self::LOG_PREFIX . $message);
+	}
+
+	/**
+	 * Custom logError function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function logError(mixed $message) {
+		Logger::logError(self::LOG_PREFIX . $message);
+	}
+
+	/**
 	 * handle Plugin Loaded
 	 * 
 	 * @param string $pluginClass 
@@ -243,7 +263,8 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
 		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
 			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
-			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
+			$this->log(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
+			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class($this)));
 		}
 	}
 
@@ -272,7 +293,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		if ($setting->belongsToClass($this)) {
 			if (($setting->setting == self::SETTING_MATCHMANAGERGSHEET_CLIENT_SECRET && $setting->value == "hidden") || $setting->setting == self::SETTING_MATCHMANAGERGSHEET_CLIENT_ID) {
 				// (Check when hidden = true to avoid double message)
-				$this->maniaControl->getChat()->sendErrorToAdmins('Google API Session cleared. You must revalidate a session with //matchgsheet step1');
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Google API Session cleared. You must revalidate a session with //matchgsheet step1');
 
 				$this->saveSecretSetting("access_token");
 				$this->saveSecretSetting("expire");
@@ -292,7 +313,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 
 	public function handlePlayerConnect(Player $player) {
 		if ($this->maniaControl->getAuthenticationManager()->checkRight($player, AuthenticationManager::AUTH_LEVEL_ADMIN)) {
-			$this->maniaControl->getChat()->sendError('Since MatchManagerGSheet 2.0, Player names are in the results and no more in a separated list', $player->login);
+			$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Since MatchManagerGSheet 2.0, Player names are in the results and no more in a separated list', $player->login);
 		}
 	}
 
@@ -346,15 +367,15 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		} elseif (isset($text[1]) && $text[1] == 'check') { 
 			$this->CheckSpeadsheetAccess($player);
 		} else {
-			$this->maniaControl->getChat()->sendError('use argument "step1", "step2" or "check"', $player);
+			$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'use argument "step1", "step2" or "check"', $player);
 		}
 	}
 
 	private function OAuth2Step1(Player $player) {
 		$clientid = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_CLIENT_ID);
 		if (empty($clientid)) {
-			Logger::logError('Client ID empty');
-			$this->maniaControl->getChat()->sendError('Client ID empty', $player);
+			$this->logError('Client ID empty');
+			$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Client ID empty', $player);
 			return;
 		}
 
@@ -362,29 +383,29 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		$asyncHttpRequest->setContentType("application/x-www-form-urlencoded");
 		$asyncHttpRequest->setCallable(function ($json, $error) use ($player) {
 			if (!$json || $error) {
-				Logger::logError('Error from Google API: ' . $error);
-				$this->maniaControl->getChat()->sendError('Error from Google API: ' . $error, $player);
+				$this->logError('Error from Google API: ' . $error);
+				$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Error from Google API: ' . $error, $player);
 				return;
 			}
 			$data = json_decode($json);
 			if (!$data) {
-				Logger::logError('Json parse error: ' . $json);
-				$this->maniaControl->getChat()->sendError('Json parse error: ' . $json, $player);
+				$this->logError('Json parse error: ' . $json);
+				$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Json parse error: ' . $json, $player);
 				return;
 			}
 			if (property_exists($data, "error")) {
-				Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
-				$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+				$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
 				return;
 			}
 			if (isset($data->device_code)) {
 				$this->device_code = $data->device_code;
-				$this->maniaControl->getChat()->sendSuccess('Open $<$l['. $data->verification_url .'?user_code=' . $data->user_code . ']this link$> and type this code: "' . $data->user_code .'"' , $player);
-				$this->maniaControl->getChat()->sendSuccess('After have validate the App, type the commande "//matchgsheet step2"' , $player);
+				$this->maniaControl->getChat()->sendSuccess($this->MatchManagerCore->getChatPrefix() .'Open $<$l['. $data->verification_url .'?user_code=' . $data->user_code . ']this link$> and type this code: "' . $data->user_code .'"' , $player);
+				$this->maniaControl->getChat()->sendSuccess($this->MatchManagerCore->getChatPrefix() .'After have validate the App, type the commande "//matchgsheet step2"' , $player);
 			} elseif (isset($data->error_code)) {
-				$this->maniaControl->getChat()->sendError('Google refused the request: ' . $data->error_code, $player);
+				$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Google refused the request: ' . $data->error_code, $player);
 			} else {
-				$this->maniaControl->getChat()->sendError('Unkown error' , $player);
+				$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Unkown error' , $player);
 			}
 		});
 
@@ -394,21 +415,21 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	private function OAuth2Step2(Player $player) {
 		$clientid = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_CLIENT_ID);
 		if (empty($clientid)) {
-			Logger::logError('Client ID empty');
-			$this->maniaControl->getChat()->sendError('Client ID empty', $player);
+			$this->logError('Client ID empty');
+			$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Client ID empty', $player);
 			return;
 		}
 
 		$clientsecret = $this->getSecretSetting("client_secret");
 		if (empty($clientsecret)) {
-			Logger::logError('Client Secret empty');
-			$this->maniaControl->getChat()->sendError('Client Secret empty', $player);
+			$this->logError('Client Secret empty');
+			$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Client Secret empty', $player);
 			return;
 		}
 
 		if (empty($this->device_code)) {
-			Logger::logError('No device_code. Have you run the step 1?');
-			$this->maniaControl->getChat()->sendError('No device_code. Have you run the step 1?', $player);
+			$this->logError('No device_code. Have you run the step 1?');
+			$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'No device_code. Have you run the step 1?', $player);
 			return;
 		}
 
@@ -417,19 +438,19 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		$asyncHttpRequest->setHeaders(array("Content-Length: 0"));
 		$asyncHttpRequest->setCallable(function ($json, $error) use ($player) {
 			if (!$json || $error) {
-				Logger::logError('Error from Google API: ' . $error);
-				$this->maniaControl->getChat()->sendError('Error from Google API: ' . $error, $player);
+				$this->logError('Error from Google API: ' . $error);
+				$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Error from Google API: ' . $error, $player);
 				return;
 			}
 			$data = json_decode($json);
 			if (!$data) {
-				Logger::logError('Json parse error: ' . $json);
-				$this->maniaControl->getChat()->sendError('Json parse error: ' . $json, $player);
+				$this->logError('Json parse error: ' . $json);
+				$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Json parse error: ' . $json, $player);
 				return;
 			}
 			if (property_exists($data, "error")) {
-				Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
-				$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+				$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
 				return;
 			}
 
@@ -438,13 +459,13 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				$this->saveSecretSetting("access_token", $data->access_token);
 				$this->saveSecretSetting("expire", time() + $data->expires_in);
 				$this->saveSecretSetting("refresh_token", $data->refresh_token);
-				$this->maniaControl->getChat()->sendSuccess('Maniacontrol is registered' , $player);
+				$this->maniaControl->getChat()->sendSuccess($this->MatchManagerCore->getChatPrefix() .'Maniacontrol is registered' , $player);
 			} elseif (isset($data->error_description)) {
-				Logger::logError('Google refused the request: ' . $data->error_description);
-				$this->maniaControl->getChat()->sendError('Google refused the request: ' . $data->error_description , $player);
+				$this->logError('Google refused the request: ' . $data->error_description);
+				$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Google refused the request: ' . $data->error_description , $player);
 			} else {
-				Logger::logError('Unkown error' . $data->error_description);
-				$this->maniaControl->getChat()->sendError('Unkown error' , $player);
+				$this->logError('Unkown error' . $data->error_description);
+				$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Unkown error' , $player);
 			}
 		});
 
@@ -452,7 +473,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	}
 
 	private function refreshTokenIfNeeded() {
-		Logger::Log('refreshTokenIfNeeded');
+		$this->Log('refreshTokenIfNeeded');
 		$this->access_token = $this->getSecretSetting("access_token");
 		$expire = $this->getSecretSetting("expire");
 		$refreshtoken = $this->getSecretSetting("refresh_token");
@@ -465,18 +486,18 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				$json = $response->getContent();
 				$error = $response->getError();
 				if (!$json || $error) {
-					Logger::logError('Error during token refresh: ' . $error);
-					$this->maniaControl->getChat()->sendErrorToAdmins('Error during token refresh: ' . $error);
+					$this->logError('Error during token refresh: ' . $error);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Error during token refresh: ' . $error);
 					return;
 				}
 				$data = json_decode($json);
 				if (!$data) {
-					Logger::logError('Json parse error: ' . $json);
+					$this->logError('Json parse error: ' . $json);
 					return;
 				}
 				if (property_exists($data, "error")) {
-					Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
-					$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
 					return;
 				}
 
@@ -485,9 +506,9 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					$this->saveSecretSetting("access_token", $data->access_token);
 					$this->saveSecretSetting("expire", time() + $data->expires_in);
 				} elseif (isset($data->error_description)) {
-					$this->maniaControl->getChat()->sendErrorToAdmins('Google refused the request: ' . $data->error_description);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Google refused the request: ' . $data->error_description);
 				} else {
-					$this->maniaControl->getChat()->sendErrorToAdmins('Unkown error');
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Unkown error');
 				}
 			}
 			return true;
@@ -530,7 +551,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	private function CheckSpeadsheetAccess(Player $player) {
 		$spreadsheetid = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET);
 		if ($spreadsheetid === "") {
-			$this->maniaControl->getChat()->sendError('Empty Spreadsheet Id', $player);
+			$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Empty Spreadsheet Id', $player);
 			return;
 		}
 
@@ -540,32 +561,32 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 			$asyncHttpRequest->setCallable(function ($json, $error) use ($player) {
 				if (!$json || $error) {
-					Logger::logError('Error: ' . $error);
-					$this->maniaControl->getChat()->sendError('Error: ' . $error, $player);
+					$this->logError('Error: ' . $error);
+					$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Error: ' . $error, $player);
 					return;
 				}
 				$data = json_decode($json);
 				if (!$data) {
-					Logger::logError('Json parse error: ' . $json);
-					$this->maniaControl->getChat()->sendError('Json parse error: ' . $json, $player);
+					$this->logError('Json parse error: ' . $json);
+					$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() .'Json parse error: ' . $json, $player);
 					return;
 				}
 				if (property_exists($data, "error")) {
-					Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
-					$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
 					return;
 				}
 
 				if (isset($data->properties->title)) {
-					$this->maniaControl->getChat()->sendSuccess('Speadsheet name: ' . $data->properties->title, $player);
+					$this->maniaControl->getChat()->sendSuccess($this->MatchManagerCore->getChatPrefix() .'Speadsheet name: ' . $data->properties->title, $player);
 				} else {
-					$this->maniaControl->getChat()->sendError("Can't access to the Spreadsheet: " . $data->error->message, $player);
+					$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() ."Can't access to the Spreadsheet: " . $data->error->message, $player);
 				}
 			});
 
 			$asyncHttpRequest->getData(1000);
 		} else {
-			$this->maniaControl->getChat()->sendError("Can't have access to Google API service", $player);
+			$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() ."Can't have access to Google API service", $player);
 		}
 	}
 
@@ -632,19 +653,19 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			$asyncHttpRequest->setContent(json_encode($data));
 			$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname, $spreadsheetid, $currentscore, $currentteamsscore, $matchstatus, $nbmaps, $nbrounds) {
 				if (!$json || $error) {
-					Logger::logError('Error from Google API: ' . $error);
-					$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
+					$this->logError('Error from Google API: ' . $error);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Error from Google API: ' . $error);
 					return;
 				}
 				$data = json_decode($json);
 				if (!$data) {
-					Logger::logError('Json parse error: ' . $json);
-					$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+					$this->logError('Json parse error: ' . $json);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Json parse error: ' . $json);
 					return;
 				}
 				if (property_exists($data, "error")) {
-					Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
-					$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
 					return;
 				}
 
@@ -665,19 +686,19 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					$asyncHttpRequest->setContent(json_encode($data));
 					$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname, $spreadsheetid, $currentteamsscore, $nbmaps, $nbrounds) {
 						if (!$json || $error) {
-							Logger::logError('Error from Google API: ' . $error);
-							$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
+							$this->logError('Error from Google API: ' . $error);
+							$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Error from Google API: ' . $error);
 							return;
 						}
 						$data = json_decode($json);
 						if (!$data) {
-							Logger::logError('Json parse error: ' . $json);
-							$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+							$this->logError('Json parse error: ' . $json);
+							$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Json parse error: ' . $json);
 							return;
 						}
 						if (property_exists($data, "error")) {
-							Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
-							$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+							$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
+							$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
 							return;
 						}
 
@@ -698,19 +719,19 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 							$asyncHttpRequest->setContent(json_encode($data));
 							$asyncHttpRequest->setCallable(function ($json, $error) {
 								if (!$json || $error) {
-									Logger::logError('Error from Google API: ' . $error);
-									$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
+									$this->logError('Error from Google API: ' . $error);
+									$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Error from Google API: ' . $error);
 									return;
 								}
 								$data = json_decode($json);
 								if (!$data) {
-									Logger::logError('Json parse error: ' . $json);
-									$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+									$this->logError('Json parse error: ' . $json);
+									$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Json parse error: ' . $json);
 									return;
 								}
 								if (property_exists($data, "error")) {
-									Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
-									$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+									$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
+									$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
 									return;
 								}
 							});
@@ -722,17 +743,17 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			});	
 			$asyncHttpRequest->postData(1000);
 		} else {
-			$this->maniaControl->getChat()->sendErrorToAdmins('Impossible to update the Google Sheet');
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Impossible to update the Google Sheet');
 		}
 	}
 
 	function onCallbackEndRound(String $matchid, Array $currentscore, Array $currentteamsscore) {
-		Logger::Log('onCallbackEndRound');
+		$this->Log('onCallbackEndRound');
 		$this->matchstatus = "running";
 		$this->UpdateGSheetData($matchid, $currentscore, $currentteamsscore);
 	}
 	function onCallbackEndMatch(String $matchid, Array $currentscore, Array $currentteamsscore) {
-		Logger::Log('onCallbackEndMatch');
+		$this->Log('onCallbackEndMatch');
 		$this->matchstatus = "ended";
 
 		$this->maniaControl->getTimerManager()->registerOneTimeListening($this, function () use ($matchid, $currentscore, $currentteamsscore) {
@@ -740,7 +761,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		}, 1000); // Wait a sec before sending last data to avoid collision
 	}
 	function onCallbackStopMatch(String $matchid, Array $currentscore, Array $currentteamsscore) {
-		Logger::Log('onCallbackStopMatch');
+		$this->Log('onCallbackStopMatch');
 		$this->matchstatus = "stopped";
 		$this->UpdateGSheetData($matchid, $currentscore, $currentteamsscore);
 	}
@@ -759,19 +780,19 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 			$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname) {
 				if (!$json || $error) {
-					Logger::logError('Error from Google API: ' . $error);
-					$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
+					$this->logError('Error from Google API: ' . $error);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Error from Google API: ' . $error);
 					return;
 				}
 				$data = json_decode($json);
 				if (!$data) {
-					Logger::logError('Json parse error: ' . $json);
-					$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+					$this->logError('Json parse error: ' . $json);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Json parse error: ' . $json);
 					return;
 				}
 				if (property_exists($data, "error")) {
-					Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
-					$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
 					return;
 				}
 
@@ -812,7 +833,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			$i = 0;
 
 			if (!$sheetexists) {
-				Logger::Log("Creating new Sheet: " . $sheetname);
+				$this->Log("Creating new Sheet: " . $sheetname);
 				$sheetid = rand(1000,2147483646);
 				while (in_array($sheetid, $sheetsid)) {
 					$sheetid = rand(1000,2147483646);
@@ -907,19 +928,19 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 			$asyncHttpRequest->setContent(json_encode($data));
 			$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname, $spreadsheetid) {
 				if (!$json || $error) {
-					Logger::logError('Error from Google API: ' . $error);
-					$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
+					$this->logError('Error from Google API: ' . $error);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Error from Google API: ' . $error);
 					return;
 				}
 				$data = json_decode($json);
 				if (!$data) {
-					Logger::logError('Json parse error: ' . $json);
-					$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+					$this->logError('Json parse error: ' . $json);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Json parse error: ' . $json);
 					return;
 				}
 				if (property_exists($data, "error")) {
-					Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
-					$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
 					return;
 				}
 
@@ -928,19 +949,19 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
 				$asyncHttpRequest->setCallable(function ($json, $error) use ($sheetname, $spreadsheetid) {
 					if (!$json || $error) {
-						Logger::logError('Error from Google API: ' . $error);
-						$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
+						$this->logError('Error from Google API: ' . $error);
+						$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Error from Google API: ' . $error);
 						return;
 					}
 					$data = json_decode($json);
 					if (!$data) {
-						Logger::logError('Json parse error: ' . $json);
-						$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+						$this->logError('Json parse error: ' . $json);
+						$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Json parse error: ' . $json);
 						return;
 					}
 					if (property_exists($data, "error")) {
-						Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
-						$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+						$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
+						$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
 						return;
 					}
 
@@ -966,19 +987,19 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					$asyncHttpRequest->setContent(json_encode($data));
 					$asyncHttpRequest->setCallable(function ($json, $error) {
 						if (!$json || $error) {
-							Logger::logError('Error from Google API: ' . $error);
-							$this->maniaControl->getChat()->sendErrorToAdmins('Error from Google API: ' . $error);
+							$this->logError('Error from Google API: ' . $error);
+							$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Error from Google API: ' . $error);
 							return;
 						}
 						$data = json_decode($json);
 						if (!$data) {
-							Logger::logError('Json parse error: ' . $json);
-							$this->maniaControl->getChat()->sendErrorToAdmins('Json parse error: ' . $json);
+							$this->logError('Json parse error: ' . $json);
+							$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Json parse error: ' . $json);
 							return;
 						}
 						if (property_exists($data, "error")) {
-							Logger::logError('Request error: ' . $data->error->code . " ". $data->error->message);
-							$this->maniaControl->getChat()->sendErrorToAdmins('Request error: ' . $data->error->code . " ". $data->error->message);
+							$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
+							$this->maniaControl->getChat()->sendErrorToAdmins('$this->MatchManagerCore->getChatPrefix() .Request error: ' . $data->error->code . " ". $data->error->message);
 							return;
 						}
 					});

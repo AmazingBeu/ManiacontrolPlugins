@@ -19,8 +19,8 @@ use ManiaControl\Utils\WebReader;
 
 
 if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
-	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
-	Logger::logError('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
+	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use MatchManagerTMWTDuoIntegration plugin. Install it and restart Maniacontrol');
+	Logger::logError('MatchManager Core is required to use MatchManagerTMWTDuoIntegration plugin. Install it and restart Maniacontrol');
 	return false;
 }
 use MatchManagerSuite\MatchManagerCore;
@@ -37,9 +37,11 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 * Constants
 	 */
 	const PLUGIN_ID											= 211;
-	const PLUGIN_VERSION									= 1.0;
+	const PLUGIN_VERSION									= 1.1;
 	const PLUGIN_NAME										= 'MatchManager TMWT Duo Integration';
 	const PLUGIN_AUTHOR										= 'Beu';
+
+	const LOG_PREFIX										= '[MatchManagerTMWTDuoIntegration] ';
 
 	// Other MatchManager plugin
 	const MATCHMANAGERCORE_PLUGIN							= 'MatchManagerSuite\MatchManagerCore';
@@ -62,6 +64,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	const SETTING_PICKANDBAN_ENABLE 						= 'Enable Pick & Ban';
 	const SETTING_PICKANDBAN_STEPCONFIG 					= 'Pick & Ban: Step config';
 	const SETTING_PICKANDBAN_STEPDURATION 					= 'Pick & Ban: Step duration';
+	const SETTING_PICKANDBAN_OVERRIDEMAPORDER	 			= 'Pick & Ban: Override Map Order';
 	const SETTING_PICKANDBAN_RESULTDURATION 				= 'Pick & Ban: Result duration';
 
 	const STATE_NOTHING = 0;
@@ -74,6 +77,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 */
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl 			= null;
+	/** @var MatchManagerCore $MatchManagerCore */
 	private $MatchManagerCore		= null;
 	private $state = 0;
 
@@ -139,7 +143,8 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_PICKANDBAN_ENABLE, false, '', 20);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_PICKANDBAN_STEPCONFIG, '', 'Similar syntax as the ofiicial Competition Tool. e.g: b:1,b:0,p:0,p:1,p:1,p:0,b:0,b:1,p:r');
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_PICKANDBAN_STEPDURATION, 60000, 'Each step duration in ms', 110);
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_PICKANDBAN_RESULTDURATION, 10000, 'result duration in ms', 120);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_PICKANDBAN_OVERRIDEMAPORDER, '', 'Override map order received by the server. e.g: 1,2,4,3,5', 120);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_PICKANDBAN_RESULTDURATION, 10000, 'result duration in ms', 130);
 
 		// Callbacks
 		$this->maniaControl->getManialinkManager()->registerManialinkPageAnswerListener(self::ML_ACTION_OPENSETTINGS, $this, 'handleActionOpenSettings');
@@ -155,6 +160,24 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 
 		$this->MatchManagerCore->addCanStartFunction($this, 'canStartMatch'); 
 		$this->updateAdminUIMenuItems();
+	}
+
+	/**
+	 * Custom log function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function log(mixed $message) {
+		Logger::log(self::LOG_PREFIX . $message);
+	}
+
+	/**
+	 * Custom logError function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function logError(mixed $message) {
+		Logger::logError(self::LOG_PREFIX . $message);
 	}
 
 	/**
@@ -221,20 +244,20 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 */
 	public function canStartMatch() {
 		if ($this->maniaControl->getSettingManager()->getSettingValue($this->MatchManagerCore, 'S_TeamsUrl') === '') {
-			$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() . " S_TeamsUrl must be defined");
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() . "S_TeamsUrl must be defined");
 			return false;
 		}
 		if (
 			$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM1) === '' ||
 			$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM2) === ''
 		) {
-			$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() . " Team Id must be defined");
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() . "Team Id must be defined");
 			return false;
 		}
 
 		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_PICKANDBAN_ENABLE)) {
 			if ($this->maniaControl->getSettingManager()->getSettingValue($this->MatchManagerCore, $this->MatchManagerCore::SETTING_MATCH_SETTINGS_MODE) !== "All from the plugin") {
-				$this->maniaControl->getChat()->sendErrorToAdmins('TMWT Pick and bans are only supported in Match Manager Core "All from the plugin" mode');
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'TMWT Pick and bans are only supported in MatchManagerCore "All from the plugin" mode');
 				return false;
 			}
 		}
@@ -254,8 +277,8 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 		if ($setting !== null && !$setting->value) {
 			$setting->value = true;
 			$this->maniaControl->getSettingManager()->saveSetting($setting);
-			Logger::logWarning('Remplacing S_IsMatchmaking setting value in MatchManagerCore for TMWT integration');
-			$this->maniaControl->getChat()->sendErrorToAdmins('Remplacing S_IsMatchmaking setting value in MatchManagerCore for TMWT integration');
+			$this->logError('Remplacing S_IsMatchmaking setting value in MatchManagerCore for TMWT integration');
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Remplacing S_IsMatchmaking setting value in MatchManagerCore for TMWT integration');
 		}
 
 		if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_PICKANDBAN_ENABLE)) {
@@ -263,8 +286,8 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 			if ($setting !== null && !$setting->value) {
 				$setting->value = true;
 				$this->maniaControl->getSettingManager()->saveSetting($setting);
-				Logger::logWarning('Remplacing S_PickAndBan_Enable setting value in MatchManagerCore for TMWT integration');
-				$this->maniaControl->getChat()->sendErrorToAdmins('Remplacing S_PickAndBan_Enable setting value in MatchManagerCore for TMWT integration');
+				$this->logError('Remplacing S_PickAndBan_Enable setting value in MatchManagerCore for TMWT integration');
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Remplacing S_PickAndBan_Enable setting value in MatchManagerCore for TMWT integration');
 			}
 		}
 	}
@@ -317,14 +340,14 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 						if ($team->Id === $team1) {
 							$team1 = null;
 							foreach ($team->Players as $player) {
-								Logger::log($player->AccountId ." added to team 1");
+								$this->log($player->AccountId ." added to team 1");
 								$this->maniaControl->getClient()->triggerModeScriptEvent(self::XMLRPC_METHOD_ADDPLAYER, [$player->AccountId, "1"], true);
 							}
 						}
 						if ($team->Id === $team2) {
 							$team2 = null;
 							foreach ($team->Players as $player) {
-								Logger::log($player->AccountId ." added to team 2");
+								$this->log($player->AccountId ." added to team 2");
 								$this->maniaControl->getClient()->triggerModeScriptEvent(self::XMLRPC_METHOD_ADDPLAYER, [$player->AccountId, "2"], true);
 							}
 						}
@@ -333,8 +356,8 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 					}
 
 					if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_PICKANDBAN_ENABLE)) {
-						Logger::log('Starting Pick & ban in 10 seconds');
-						$this->maniaControl->getChat()->sendSuccess('Starting pick & ban in 10 seconds');
+						$this->log('Starting Pick & ban in 10 seconds');
+						$this->maniaControl->getChat()->sendSuccess($this->MatchManagerCore->getChatPrefix() .'Starting pick & ban in 10 seconds');
 						$this->maniaControl->getTimerManager()->registerOneTimeListening($this, function () {
 						$payload = [
 							'stepDuration' => $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_PICKANDBAN_STEPDURATION),
@@ -364,12 +387,12 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 
 						$json = json_encode($payload);
 
-						Logger::log('Starting Pick & ban: '. $json);
+						$this->log('Starting Pick & ban: '. $json);
 						$this->maniaControl->getClient()->triggerModeScriptEvent(self::XMLRPC_METHOD_STARTPICKANDBAN, [$json], true);
 						}, 5000);
 					} else {
 						$this->state = self::STATE_MATCH;
-						Logger::log('Sending match start callback');
+						$this->log('Sending match start callback');
 						$this->maniaControl->getClient()->triggerModeScriptEvent(self::XMLRPC_METHOD_MATCHSTARTED, [], true);
 					}
 				}
@@ -385,13 +408,30 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 */
 	public function handlePickAndBanComplete(array $structure) {
 		if (!$this->MatchManagerCore->getMatchStatus()) return;
-		Logger::log('Received picks: '. $structure[1][0]);
+		$this->log('Received picks: '. $structure[1][0]);
 
 		$this->maniaControl->getTimerManager()->registerOneTimeListening($this, function () use ($structure) {
 			try {
 				$json = json_decode($structure[1][0]);
 	
 				$mapUids = array_column($json->playlist, 'uid');
+
+				$order = explode(',', $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_PICKANDBAN_OVERRIDEMAPORDER));
+
+				if (count($order) === count($mapUids)) {
+					$this->log("Re-ordering maps");
+					try {
+						$orderedMapUid = [];
+						foreach ($order as $number) {
+							$orderedMapUid[] = $mapUids[$number - 1];
+						}
+						$mapUids = $orderedMapUid;
+					} catch (\Throwable $th) {
+						$this->logError("Invalid Map order setting");
+						$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() ."Invalid Map order setting");
+					}
+				}
+
 				$mapList = [];
 				foreach ($this->maniaControl->getMapManager()->getMaps() as $map) {
 					$index = array_search($map->uid, $mapUids);
@@ -404,19 +444,19 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 				}
 	
 				if (count($mapUids) !== count($mapList)) {
-					Logger::logError("Missing maps: ". implode(' ', array_diff($mapUids, $mapList)));
+					$this->logError("Missing maps: ". implode(' ', array_diff($mapUids, $mapList)));
 				}
 	
 				ksort($mapList);
 
 				$this->maniaControl->getClient()->chooseNextMapList(array_values($mapList));
 			} catch (\Throwable $th) {
-				Logger::logError("Can't apply map list: ". $th->getMessage());
-				$this->maniaControl->getChat()->sendError("Can't apply map list: ". $th->getMessage());
+				$this->logError("Can't apply map list: ". $th->getMessage());
+				$this->maniaControl->getChat()->sendError($this->MatchManagerCore->getChatPrefix() ."Can't apply map list: ". $th->getMessage());
 			}
 
 			$this->state = self::STATE_MATCH;
-			Logger::log('Sending match start callback');
+			$this->log('Sending match start callback');
 			$this->maniaControl->getClient()->triggerModeScriptEvent(self::XMLRPC_METHOD_MATCHSTARTED, [], true);
 			$this->maniaControl->getMapManager()->getMapActions()->skipMap();
 		}, $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_PICKANDBAN_RESULTDURATION));
@@ -431,8 +471,8 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 */
 	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
 		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
-			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
-			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
+			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class($this)));
 		}
 	}
 
@@ -446,7 +486,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 		if ($setting->setting === self::SETTING_PICKANDBAN_ENABLE || $setting->setting === $this->MatchManagerCore::SETTING_MATCH_SETTINGS_MODE) {
 			if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_PICKANDBAN_ENABLE)) {
 				if ($this->maniaControl->getSettingManager()->getSettingValue($this->MatchManagerCore, $this->MatchManagerCore::SETTING_MATCH_SETTINGS_MODE) !== "All from the plugin") {
-					$this->maniaControl->getChat()->sendErrorToAdmins('TMWT Pick and bans are only supported in Match Manager Core "All from the plugin" mode');
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'TMWT Pick and bans are only supported in Match Manager Core "All from the plugin" mode');
 				}
 			}
 		}
@@ -456,7 +496,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 * @see \ManiaControl\Plugins\Plugin::unload()
 	 */
 	public function unload() {
-		$this->MatchManagerCore->removeCanStartFunction($this, 'canStartMatch'); 
+		if ($this->MatchManagerCore !== null) $this->MatchManagerCore->removeCanStartFunction($this, 'canStartMatch'); 
 		/** @var \MatchManagerSuite\MatchManagerAdminUI|null */
 		$adminUIPlugin = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERADMINUI_PLUGIN);
 		if ($adminUIPlugin !== null) {

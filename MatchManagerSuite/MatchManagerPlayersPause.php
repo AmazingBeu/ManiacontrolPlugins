@@ -21,8 +21,8 @@ use ManiaControl\Commands\CommandListener;
 
 
 if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
-	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
-	Logger::logError('MatchManager Core is required to use one of MatchManager plugin. Install it and restart Maniacontrol');
+	$this->maniaControl->getChat()->sendErrorToAdmins('MatchManager Core is required to use MatchManagerPlayersPause plugin. Install it and restart Maniacontrol');
+	Logger::logError('MatchManager Core is required to use MatchManagerPlayersPause plugin. Install it and restart Maniacontrol');
 	return false;
 }
 
@@ -42,6 +42,8 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	const PLUGIN_NAME										= 'MatchManager Players Pause';
 	const PLUGIN_AUTHOR										= 'Beu';
 
+	const LOG_PREFIX										= '[MatchManagerPlayersPause] ';
+
 	// MatchManagerWidget Properties
 	const MATCHMANAGERCORE_PLUGIN							= 'MatchManagerSuite\MatchManagerCore';
 
@@ -58,6 +60,7 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	 */
 	/** @var ManiaControl $maniaControl */
 	private $maniaControl 			= null;
+	/** @var MatchManagerCore $MatchManagerCore */
 	private $MatchManagerCore		= null;
 
 	private $playerspausestate		= array();
@@ -161,6 +164,24 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	}
 
 	/**
+	 * Custom log function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function log(mixed $message) {
+		Logger::log(self::LOG_PREFIX . $message);
+	}
+
+	/**
+	 * Custom logError function to add prefix
+	 * 
+	 * @param mixed $message
+	 */
+	private function logError(mixed $message) {
+		Logger::logError(self::LOG_PREFIX . $message);
+	}
+
+	/**
 	 * handlePluginUnloaded
 	 *
 	 * @param  string $pluginClass
@@ -170,7 +191,8 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
 		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
 			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
-			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class()));
+			$this->log(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
+			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class($this)));
 		}
 	}
 
@@ -211,7 +233,7 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 				if ($nbpause >= $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_PAUSE_NBPLAYERS)) {
 					$this->playerspausestate = array();
 					$this->closePauseWidget();
-					Logger::log('Pause requested by players');
+					$this->log('Pause requested by players');
 					if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_PAUSE_WAIT_END_ROUND)) {
 						if ($this->maniaControl->getSettingManager()->getSettingValue($this->maniaControl, MatchManagerCore::SETTING_MATCH_PAUSE_DURATION) <= 0) {
 							$this->maniaControl->getChat()->sendInformation($this->MatchManagerCore->getChatPrefix() . 'Ask the admins to resume the match');
