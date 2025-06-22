@@ -14,6 +14,7 @@ use ManiaControl\Callbacks\Structures\TrackMania\OnWayPointEventStructure;
 use ManiaControl\Callbacks\TimerListener;
 use ManiaControl\Manialinks\ManialinkPageAnswerListener;
 use ManiaControl\Players\Player;
+use ManiaControl\Plugins\PluginManager;
 use ManiaControl\Plugins\PluginMenu;
 
 if (!class_exists('MatchManagerSuite\MatchManagerCore')) {
@@ -114,6 +115,8 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 					return;
 				}
 
+				$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_LOADED, $this, 'handlePluginLoaded');
+				$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_UNLOADED, $this, 'handlePluginUnloaded');
 				$this->maniaControl->getCallbackManager()->registerScriptCallbackListener(self::CB_STARTMAP, $this, 'handleStartMap');
 				$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_STARTROUNDSTART, $this, 'handleStartRound');
 				$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_ONWAYPOINT, $this, 'handleOnWaypoint');
@@ -160,6 +163,22 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 			$this->updateAdminUIMenuItems();
 		}
 	}
+
+	/**
+	 * handlePluginUnloaded
+	 *
+	 * @param  string $pluginClass
+	 * @param  Plugin $plugin
+	 * @return void
+	 */
+	public function handlePluginUnloaded(string $pluginClass, Plugin $plugin) {
+		if ($pluginClass == self::MATCHMANAGERCORE_PLUGIN) {
+			$this->maniaControl->getChat()->sendErrorToAdmins(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
+			$this->log(self::PLUGIN_NAME . " disabled because MatchManager Core is now disabled");
+			$this->maniaControl->getPluginManager()->deactivatePlugin((get_class($this)));
+		}
+	}
+
 
 	/**
 	 * Add items in AdminUI plugin
@@ -353,5 +372,11 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 	/**
 	 * Unload the plugin and its Resources
 	 */
-	public function unload() {}
+	public function unload() {
+		/** @var \MatchManagerSuite\MatchManagerAdminUI|null */
+		$adminUIPlugin = $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERADMINUI_PLUGIN);
+		if ($adminUIPlugin !== null) {
+			$adminUIPlugin->removeMenuItem(self::ML_ACTION_OPENSETTINGS);
+		}
+	}
 }
