@@ -34,7 +34,7 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 	* Constants
 	*/
 	const PLUGIN_ID			= 213;
-	const PLUGIN_VERSION	= 1.0;
+	const PLUGIN_VERSION	= 1.1;
 	const PLUGIN_NAME		= 'MatchManager eCircuitMania';
 	const PLUGIN_AUTHOR		= 'Beu';
 

@@ -38,7 +38,7 @@ class MatchManagerPlayersPause implements ManialinkPageAnswerListener, CommandLi
 	 * Constants
 	 */
 	const PLUGIN_ID											= 159;
-	const PLUGIN_VERSION									= 1.5;
+	const PLUGIN_VERSION									= 1.6;
 	const PLUGIN_NAME										= 'MatchManager Players Pause';
 	const PLUGIN_AUTHOR										= 'Beu';
 

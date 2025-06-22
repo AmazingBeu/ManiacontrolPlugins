@@ -39,7 +39,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 2.3;
+	const PLUGIN_VERSION									= 2.4;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 

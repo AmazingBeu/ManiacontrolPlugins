@@ -44,7 +44,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 * Constants
 	 */
 	const PLUGIN_ID											= 171;
-	const PLUGIN_VERSION									= 1.6;
+	const PLUGIN_VERSION									= 1.7;
 	const PLUGIN_NAME										= 'MatchManager Multiple Config Manager';
 	const PLUGIN_AUTHOR										= 'Beu';
 

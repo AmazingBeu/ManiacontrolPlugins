@@ -32,7 +32,7 @@ class MatchManagerAdminUI implements CallbackListener, ManialinkPageAnswerListen
 	 * Constants
 	 */
 	const PLUGIN_ID											= 174;
-	const PLUGIN_VERSION									= 2.1;
+	const PLUGIN_VERSION									= 2.2;
 	const PLUGIN_NAME										= 'MatchManager Admin UI';
 	const PLUGIN_AUTHOR										= 'Beu';
 

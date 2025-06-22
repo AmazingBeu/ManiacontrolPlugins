@@ -37,7 +37,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 * Constants
 	 */
 	const PLUGIN_ID											= 211;
-	const PLUGIN_VERSION									= 1.1;
+	const PLUGIN_VERSION									= 1.2;
 	const PLUGIN_NAME										= 'MatchManager TMWT Duo Integration';
 	const PLUGIN_AUTHOR										= 'Beu';
 

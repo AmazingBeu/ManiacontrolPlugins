@@ -28,7 +28,7 @@ class MatchManagerAutomaticLauncher implements CallbackListener, TimerListener, 
 	 * Constants
 	 */
 	const PLUGIN_ID											= 172;
-	const PLUGIN_VERSION									= 1.1;
+	const PLUGIN_VERSION									= 1.2;
 	const PLUGIN_NAME										= 'MatchManager Automatic Launcher';
 	const PLUGIN_AUTHOR										= 'Beu';
 

@@ -37,7 +37,7 @@ class MatchManagerReadyButton implements ManialinkPageAnswerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 158;
-	const PLUGIN_VERSION									= 1.5;
+	const PLUGIN_VERSION									= 1.6;
 	const PLUGIN_NAME										= 'MatchManager Ready Button';
 	const PLUGIN_AUTHOR										= 'Beu';
 
