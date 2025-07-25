@@ -29,7 +29,7 @@ use MatchManagerSuite\MatchManagerCore;
 /**
  * MatchManager TMWT Duo Integration
  *
- * @author		Beu (based on MatchManagerWidget by jonthekiller)
+ * @author		Beu
  * @license		http://www.gnu.org/licenses/ GNU General Public License, Version 3
  */
 class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageAnswerListener, CommandListener, TimerListener, Plugin {
