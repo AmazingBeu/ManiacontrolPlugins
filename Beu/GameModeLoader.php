@@ -20,9 +20,32 @@ class GameModeLoader implements CommandListener, Plugin {
 	* Constants
 	*/
 	const PLUGIN_ID			= 191;
-	const PLUGIN_VERSION	= 1.0;
+	const PLUGIN_VERSION	= 1.1;
 	const PLUGIN_NAME		= 'GameModeLoader';
 	const PLUGIN_AUTHOR		= 'Beu';
+
+	const GAMEMODE_ALIASES 	= [
+		"ta"				=> 'TrackMania/TM_TimeAttack_Online.Script.txt',
+		"timeattack"		=> 'TrackMania/TM_TimeAttack_Online.Script.txt',
+		"time-attack"		=> 'TrackMania/TM_TimeAttack_Online.Script.txt',
+		"lap"				=> 'TrackMania/TM_Laps_Online.Script.txt',
+		"laps"				=> 'TrackMania/TM_Laps_Online.Script.txt',
+		"rounds"			=> 'TrackMania/TM_Rounds_Online.Script.txt',
+		"round"				=> 'TrackMania/TM_Rounds_Online.Script.txt',
+		"cup"				=> 'TrackMania/TM_Cup_Online.Script.txt',
+		"ko"				=> 'TrackMania/TM_Knockout_Online.Script.txt',
+		"knockout"			=> 'TrackMania/TM_Knockout_Online.Script.txt',
+		"team"				=> 'TrackMania/TM_Teams_Online.Script.txt',
+		"teams"				=> 'TrackMania/TM_Teams_Online.Script.txt',
+		"team"				=> 'TrackMania/TM_Teams_Online.Script.txt',
+		"teams"				=> 'TrackMania/TM_Teams_Online.Script.txt',
+		"tmwt"				=> 'TrackMania/TM_TMWT2025_Online.Script.txt',
+		"tmwt2025"			=> 'TrackMania/TM_TMWT2025_Online.Script.txt',
+		"tmwc"				=> 'TrackMania/TM_TMWC2024_Online.Script.txt',
+		"tmwc2024"			=> 'TrackMania/TM_TMWC2024_Online.Script.txt',
+		"tmwtteam"			=> 'TrackMania/TM_TMWTTeams_Online.Script.txt',
+		"tmwtteams"			=> 'TrackMania/TM_TMWTTeams_Online.Script.txt',
+	];
 
 	/*
 	* Private properties
@@ -77,7 +100,7 @@ class GameModeLoader implements CommandListener, Plugin {
 	public function load(ManiaControl $maniaControl) {
 		$this->maniaControl = $maniaControl;
 
-		$this->maniaControl->getCommandManager()->registerCommandListener('mode', $this, 'commandMode', true, 'Add all connected players to the guestlist');
+		$this->maniaControl->getCommandManager()->registerCommandListener('mode', $this, 'commandMode', true, '');
 	}
 	
 	/**
@@ -86,12 +109,17 @@ class GameModeLoader implements CommandListener, Plugin {
 	 * @param Player $player
 	 */
 	public function commandMode(array $chatCallback, Player $player) {
-		$params = explode(' ', $chatCallback[1][2]);
+		$params = explode(' ', trim($chatCallback[1][2]));
 		if (array_key_exists(1, $params) && $params[1] !== "") {
+			$mode = $params[1];
+			if (array_key_exists(strtolower($params[1]), self::GAMEMODE_ALIASES)) {
+				$mode = self::GAMEMODE_ALIASES[strtolower($params[1])];
+			}
+
 			try {
-				$this->maniaControl->getClient()->setScriptName($params[1]);
+				$this->maniaControl->getClient()->setScriptName($mode);
 				$this->maniaControl->getChat()->sendSuccess("Game mode loaded, restart or skip the map", $player->login);
-				Logger::log("Game mode " . $params[1] . " loaded by " . $player->login);
+				Logger::log("Game mode " . $mode . " loaded by " . $player->login);
 			} catch (Exception $e) {
 				$this->maniaControl->getChat()->sendError("Can't load the game mode: " . $e->getMessage(), $player->login);
 				Logger::log("Can't load the game mode: " . $e->getMessage());
