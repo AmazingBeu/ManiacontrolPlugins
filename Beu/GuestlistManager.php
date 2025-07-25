@@ -23,7 +23,7 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 	 * Constants
 	 */
 	const PLUGIN_ID			= 154;
-	const PLUGIN_VERSION	= 2.3;
+	const PLUGIN_VERSION	= 2.4;
 	const PLUGIN_NAME		= 'Guestlist Manager';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -348,6 +348,8 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 		}
 
 		try {
+			$this->maniaControl->getChat()->sendSuccess("Saving guestlist...", $player);
+
 			$filepath = $this->maniaControl->getServer()->getDirectory()->getUserDataFolder() . DIRECTORY_SEPARATOR . "Config" . DIRECTORY_SEPARATOR  . $guestlist;
 			$directory = dirname($filepath);
 
