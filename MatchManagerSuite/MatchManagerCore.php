@@ -43,7 +43,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * MARK: Constants
 	 */
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 5.9;
+	const PLUGIN_VERSION									= 6.0;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -61,6 +61,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 	// Other MatchManager plugin
 	const MATCHMANAGERADMINUI_PLUGIN							= 'MatchManagerSuite\MatchManagerAdminUI';
+	const MATCHMANAGERTMWTDUOINTEGRATION_PLUGIN					= 'MatchManagerSuite\MatchManagerTMWTDuoIntegration';
 
 	// Actions
 	const ML_ACTION_OPENSETTINGS						= 'MatchManagerSuite\MatchManagerCore.OpenSettings';
@@ -100,13 +101,17 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	const SETTING_MATCH_S_CUMULATEPOINTS					= 'S_CumulatePoints';
 	const SETTING_MATCH_S_DISABLEGIVEUP						= 'S_DisableGiveUp';
 	const SETTING_MATCH_S_DISABLEGOTOMAP					= 'S_DisableGoToMap';
+	const SETTING_MATCH_S_DISABLEMATCHINTRO					= 'S_DisableMatchIntro';
 	const SETTING_MATCH_S_EARLYENDMATCHCALLBACK				= 'S_EarlyEndMatchCallback';
 	const SETTING_MATCH_S_ELIMINATEDPLAYERSNBRANKS			= 'S_EliminatedPlayersNbRanks';
 	const SETTING_MATCH_S_ENABLEDOSSARDCOLOR				= 'S_EnableDossardColor';
 	const SETTING_MATCH_S_FINISHTIMEOUT						= 'S_FinishTimeout';
 	const SETTING_MATCH_S_FORCELAPSNB						= 'S_ForceLapsNb';
 	const SETTING_MATCH_S_FORCEROADSPECTATORSNB				= 'S_ForceRoadSpectatorsNb';
+	const SETTING_MATCH_S_HEADERLOGOURL						= 'S_HeaderLogoUrl';
 	const SETTING_MATCH_S_INFINITELAPS						= 'S_InfiniteLaps';
+	const SETTING_MATCH_S_INTROBACKGROUNDURL				= 'S_IntroBackgroundUrl';
+	const SETTING_MATCH_S_INTROLOGOURL						= 'S_IntroLogoUrl';
 	const SETTING_MATCH_S_LOADINGSCREENIMAGEURL				= 'S_LoadingScreenImageUrl';
 	const SETTING_MATCH_S_MAPPOINTSLIMIT					= 'S_MapPointsLimit';
 	const SETTING_MATCH_S_MAPSPERMATCH						= 'S_MapsPerMatch';
@@ -139,7 +144,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => 10,
 			'description' => 'Time before loading the next map' ],
 		self::SETTING_MATCH_S_CRASHDETECTIONTHRESHOLD => [
-			'gamemode' => ['TMWC2023'],
+			'gamemode' => ['TMWC2023', 'TMWT2025'],
 			'type' => 'integer',
 			'default' => 2000,
 			'description' => 'Time delta in ms with the first player that will be considered as a crash' ],
@@ -158,8 +163,13 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'type' => 'boolean',
 			'default' => false,
 			'description' => 'Disable the "Go To Map" in the Pause Menu' ],
+		self::SETTING_MATCH_S_DISABLEMATCHINTRO => [
+			'gamemode' => ['TMWT2025'],
+			'type' => 'boolean',
+			'default' => false,
+			'description' => 'Disable match intro' ],
 		self::SETTING_MATCH_S_EARLYENDMATCHCALLBACK => [
-			'gamemode' => ['Knockout', 'TMWC2023', 'TMWTTeams'],
+			'gamemode' => ['Knockout', 'TMWC2023', 'TMWT2025', 'TMWTTeams'],
 			'type' => 'boolean',
 			'default' => true,
 			'description' => 'Send End Match Callback early (expert user only)' ],
@@ -169,12 +179,12 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => '4',
 			'description' => 'Rank at which one more player is eliminated per round (use coma to add more values. Ex COTD: 8,16,16)' ],
 		self::SETTING_MATCH_S_ENABLEDOSSARDCOLOR => [
-			'gamemode' => ['TMWC2023', 'TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWT2025', 'TMWTTeams'],
 			'type' => 'boolean',
 			'default' => true,
 			'description' => 'Apply color team on the dossard' ],
 		self::SETTING_MATCH_S_FINISHTIMEOUT => [
-			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TMWC2023', 'TMWTTeams', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TMWC2023', 'TMWT2025', 'TMWTTeams', 'Rounds'],
 			'type' => 'integer',
 			'default' => 10,
 			'description' => 'Time after the first finished (-1 = based on Author time)' ],
@@ -184,22 +194,37 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => -1,
 			'description' => 'Force number of laps for laps maps (-1 = author, 0 for unlimited in TA)' ],
 		self::SETTING_MATCH_S_FORCEROADSPECTATORSNB => [
-			'gamemode' => ['TMWC2023', 'TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWT2025', 'TMWTTeams'],
 			'type' => 'integer',
 			'default' => -1,
 			'description' => 'Force the number of spectators displayed on the border of the road' ],
+		self::SETTING_MATCH_S_HEADERLOGOURL => [
+			'gamemode' => ['TMWT2025'],
+			'type' => 'string',
+			'default' => '',
+			'description' => 'Header logo URL' ],
 		self::SETTING_MATCH_S_INFINITELAPS => [
 			'gamemode' => ['Global'],
 			'type' => 'boolean',
 			'default' => false,
 			'description' => 'Never end a race in laps (override S_ForceLapsNb)' ],
+		self::SETTING_MATCH_S_INTROBACKGROUNDURL => [
+			'gamemode' => ['TMWT2025'],
+			'type' => 'string',
+			'default' => '',
+			'description' => 'Intro background URL' ],
+		self::SETTING_MATCH_S_INTROLOGOURL => [
+			'gamemode' => ['TMWT2025'],
+			'type' => 'string',
+			'default' => '',
+			'description' => 'Intro logo URL' ],
 		self::SETTING_MATCH_S_LOADINGSCREENIMAGEURL => [
 			'gamemode' => ['Global'],
 			'type' => 'string',
 			'default' => "",
 			'description' => 'Image URL of the Loading Screen during the map change' ],
 		self::SETTING_MATCH_S_MAPPOINTSLIMIT => [
-			'gamemode' => ['TMWC2023', 'TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWT2025', 'TMWTTeams'],
 			'type' => 'integer',
 			'default' => 10,
 			'description' => 'Track points limit' ],
@@ -209,12 +234,12 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => 3,
 			'description' => 'Number of maps maximum in the match' ],
 		self::SETTING_MATCH_S_MATCHINFO => [
-			'gamemode' => ['TMWC2023', 'TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWT2025', 'TMWTTeams'],
 			'type' => 'string',
 			'default' => "",
 			'description' => 'Match info displayed in the UI' ],
 		self::SETTING_MATCH_S_MATCHPOINTSLIMIT => [
-			'gamemode' => ['TMWC2023', 'TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWT2025', 'TMWTTeams'],
 			'type' => 'integer',
 			'default' => 4,
 			'description' => 'Match points limit' ],
@@ -244,7 +269,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => 100,
 			'description' => 'Limit number of points (0 = unlimited for Ch & R)' ],
 		self::SETTING_MATCH_S_POINTSREPARTITION => [
-			'gamemode' => ['Cup', 'Knockout', 'Teams', 'TMWC2023', 'TMWTTeams', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Teams', 'TMWC2023', 'TMWT2025', 'TMWTTeams', 'Rounds'],
 			'type' => 'string',
 			'default' => '10,6,4,3,2,1',
 			'description' => 'Point repartition from first to last' ],
@@ -264,12 +289,12 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => 1,
 			'description' => 'Rounds without elimination (like a Warmup, but just for the first map)' ],
 		self::SETTING_MATCH_S_SPONSORSURL => [
-			'gamemode' => ['TMWC2023', 'TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWT2025', 'TMWTTeams'],
 			'type' => 'string',
 			'default' => "",
 			'description' => 'URLs separated by a space' ],
 		self::SETTING_MATCH_S_TEAMSURL => [
-			'gamemode' => ['TMWC2023', 'TMWTTeams'],
+			'gamemode' => ['TMWC2023', 'TMWT2025', 'TMWTTeams'],
 			'type' => 'string',
 			'default' => "",
 			'description' => 'URL where to get the teams info' ],
@@ -294,17 +319,17 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			'default' => false,
 			'description' => 'Use Tie Break (Only available when S_MapsPerMatch > 1)' ],
 		self::SETTING_MATCH_S_WARMUPDURATION => [
-			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWC2023', 'TMWTTeams', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWC2023', 'TMWT2025', 'TMWTTeams', 'Rounds'],
 			'type' => 'integer',
 			'default' => -1,
 			'description' => 'Duration of 1 Warm Up in sec (-1 = one round, 0 = based on Author time)' ],
 		self::SETTING_MATCH_S_WARMUPNB => [
-			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWC2023', 'TMWTTeams', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWC2023', 'TMWT2025', 'TMWTTeams', 'Rounds'],
 			'type' => 'integer',
 			'default' => 1,
 			'description' => 'Number of Warm Up' ],
 		self::SETTING_MATCH_S_WARMUPTIMEOUT => [
-			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWC2023', 'TMWTTeams', 'Rounds'],
+			'gamemode' => ['Cup', 'Knockout', 'Laps', 'Teams', 'TimeAttack', 'TMWC2023', 'TMWT2025', 'TMWTTeams', 'Rounds'],
 			'type' => 'integer',
 			'default' => -1,
 			'description' => 'Time after the first finished the WarmUP (-1 = based on Author time, only when S_WarmUpDuration = -1)' ]
@@ -448,7 +473,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_PAUSE_POSY, 43, "Position of the Pause Countdown (on Y axis)", 15);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_SETTINGS_MODE, array('All from the plugin', 'Maps from file & Settings from plugin', 'All from file'), "Loading mode for maps and match settings, depending on your needs", 20);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_POST_MATCH_MAPLIST, "", "Load Mapfile after the match (empty to just load TA on the same maps) (can be unstable)", 20);
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Cup", "Knockout", "Laps", "Teams", "TimeAttack", "TMWC2023", "TMWTTeams", "Rounds", "RoyalTimeAttack"), "Gamemode to launch for the match", 25);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_GAMEMODE_BASE, array("Cup", "Knockout", "Laps", "Teams", "TimeAttack", "TMWC2023", "TMWT2025", "TMWTTeams", "Rounds", "RoyalTimeAttack"), "Gamemode to launch for the match", 25);
 
 		// Init dynamics settings
 		$this->updateSettings();
@@ -815,7 +840,8 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * @param Setting $setting
 	*/
 	public function updateSettings(?Setting $setting = null) {
-		if (isset($setting) && $setting->belongsToClass($this) && $this->matchStarted) {
+		if ($setting === null || !$setting->belongsToClass($this)) return;
+		if ($this->matchStarted) {
 			if ($setting->setting == self::SETTING_MATCH_GAMEMODE_BASE && $setting->value != $this->currentgmbase) {
 				$setting->value = $this->currentgmbase; 
 				$this->maniaControl->getSettingManager()->saveSetting($setting);
@@ -848,8 +874,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Settings are loaded by Matchsettings file only.');
 				}
 			}
-		} else if (isset($setting) && $setting->belongsToClass($this)) {
-			if ($setting->setting == self::SETTING_MATCH_CUSTOM_GAMEMODE && $setting->value != "") {
+		} else {
+			if ($setting->setting == self::SETTING_MATCH_GAMEMODE_BASE && in_array($setting->value, ['TMWC2023', 'TMWT2025', 'TMWTTeams']) && $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERTMWTDUOINTEGRATION_PLUGIN) === null) {
+				$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . "It's highly recommanded to use the \"MatchManager TMWT Duo Integration\" plugin with TMWT based gamemodes.");
+			} else if ($setting->setting == self::SETTING_MATCH_CUSTOM_GAMEMODE && $setting->value != "") {
 				$scriptfile = $this->maniaControl->getServer()->getDirectory()->getUserDataFolder() . DIRECTORY_SEPARATOR . "Scripts" . DIRECTORY_SEPARATOR . "Modes" . DIRECTORY_SEPARATOR . $setting->value;
 				if (!file_exists($scriptfile)) {
 					$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Unable to find the gamemode file: "' . $setting->value . '"');
@@ -876,11 +904,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			}
 		}
 
-		if ($setting === null || $setting->setting === self::SETTING_MATCH_SETTINGS_MODE || $setting->setting === self::SETTING_MATCH_GAMEMODE_BASE || $setting->setting === self::SETTING_MATCH_CUSTOM_GAMEMODE) {
+		if ($setting->setting === self::SETTING_MATCH_SETTINGS_MODE || $setting->setting === self::SETTING_MATCH_GAMEMODE_BASE || $setting->setting === self::SETTING_MATCH_CUSTOM_GAMEMODE) {
+			$deletesettings = true;
 			if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL") && $this->maniaControl->getSettingManager()->getSettingValue($this->maniaControl->getSettingManager(), SettingManager::SETTING_ALLOW_UNLINK_SERVER)) {
 				$deletesettings = !$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_DONT_DELETE_SETTINGS);
-			} else {
-				$deletesettings = true;
 			}
 			$allsettings = $this->maniaControl->getSettingManager()->getSettingsByClass($this);
 			$settingsmode = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE);
