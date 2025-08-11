@@ -43,7 +43,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * MARK: Constants
 	 */
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 6.0;
+	const PLUGIN_VERSION									= 6.1;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -840,71 +840,72 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * @param Setting $setting
 	*/
 	public function updateSettings(?Setting $setting = null) {
-		if ($setting === null || !$setting->belongsToClass($this)) return;
-		if ($this->matchStarted) {
-			if ($setting->setting == self::SETTING_MATCH_GAMEMODE_BASE && $setting->value != $this->currentgmbase) {
-				$setting->value = $this->currentgmbase; 
-				$this->maniaControl->getSettingManager()->saveSetting($setting);
-				$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'You can\'t change Gamemode during a Match');
-			} else if ($setting->setting == self::SETTING_MATCH_CUSTOM_GAMEMODE && $setting->value != $this->currentcustomgm) {
-				$setting->value = $this->currentcustomgm;
-				$this->maniaControl->getSettingManager()->saveSetting($setting);
-				$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'You can\'t change the Custom Gamemode during a Match'); 
-			} else if ($setting->setting == self::SETTING_MATCH_SETTINGS_MODE && $setting->value != $this->currentsettingmode) {
-				$setting->value = $this->currentsettingmode;
-				$this->maniaControl->getSettingManager()->saveSetting($setting);
-				$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'You can\'t change the Setting Mode during a Match'); 
-			} else if ($setting->setting == self::SETTING_MODE_HIDENEXTMAPS && $setting->value != $this->hidenextmaps) {
-				$setting->value = $this->hidenextmaps;
-				$this->maniaControl->getSettingManager()->saveSetting($setting);
-				$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'It\'s not possible to choose to hide or display the maps during a match'); 
-			} else {
-				if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from file') {
-					$this->log("Load Script Settings");
-					try {
-						$this->loadGMSettings($this->getGMSettings($this->currentgmbase,$this->currentcustomgm));
-						$this->log("Parameters updated");
-						$this->maniaControl->getChat()->sendSuccessToAdmins(self::CHAT_PREFIX . 'Parameters updated');
-					} catch (InvalidArgumentException $e) {
-						$this->log("Parameters not updated");
-						$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Parameters not updated');
-					}
-					$this->updateGMvariables();
+		if ($setting !== null && $setting->belongsToClass($this)) {
+			if ($this->matchStarted) {
+				if ($setting->setting == self::SETTING_MATCH_GAMEMODE_BASE && $setting->value != $this->currentgmbase) {
+					$setting->value = $this->currentgmbase; 
+					$this->maniaControl->getSettingManager()->saveSetting($setting);
+					$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'You can\'t change Gamemode during a Match');
+				} else if ($setting->setting == self::SETTING_MATCH_CUSTOM_GAMEMODE && $setting->value != $this->currentcustomgm) {
+					$setting->value = $this->currentcustomgm;
+					$this->maniaControl->getSettingManager()->saveSetting($setting);
+					$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'You can\'t change the Custom Gamemode during a Match'); 
+				} else if ($setting->setting == self::SETTING_MATCH_SETTINGS_MODE && $setting->value != $this->currentsettingmode) {
+					$setting->value = $this->currentsettingmode;
+					$this->maniaControl->getSettingManager()->saveSetting($setting);
+					$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'You can\'t change the Setting Mode during a Match'); 
+				} else if ($setting->setting == self::SETTING_MODE_HIDENEXTMAPS && $setting->value != $this->hidenextmaps) {
+					$setting->value = $this->hidenextmaps;
+					$this->maniaControl->getSettingManager()->saveSetting($setting);
+					$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'It\'s not possible to choose to hide or display the maps during a match'); 
 				} else {
-					$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Settings are loaded by Matchsettings file only.');
+					if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_SETTINGS_MODE) != 'All from file') {
+						$this->log("Load Script Settings");
+						try {
+							$this->loadGMSettings($this->getGMSettings($this->currentgmbase,$this->currentcustomgm));
+							$this->log("Parameters updated");
+							$this->maniaControl->getChat()->sendSuccessToAdmins(self::CHAT_PREFIX . 'Parameters updated');
+						} catch (InvalidArgumentException $e) {
+							$this->log("Parameters not updated");
+							$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Parameters not updated');
+						}
+						$this->updateGMvariables();
+					} else {
+						$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Settings are loaded by Matchsettings file only.');
+					}
 				}
-			}
-		} else {
-			if ($setting->setting == self::SETTING_MATCH_GAMEMODE_BASE && in_array($setting->value, ['TMWC2023', 'TMWT2025', 'TMWTTeams']) && $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERTMWTDUOINTEGRATION_PLUGIN) === null) {
-				$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . "It's highly recommanded to use the \"MatchManager TMWT Duo Integration\" plugin with TMWT based gamemodes.");
-			} else if ($setting->setting == self::SETTING_MATCH_CUSTOM_GAMEMODE && $setting->value != "") {
-				$scriptfile = $this->maniaControl->getServer()->getDirectory()->getUserDataFolder() . DIRECTORY_SEPARATOR . "Scripts" . DIRECTORY_SEPARATOR . "Modes" . DIRECTORY_SEPARATOR . $setting->value;
-				if (!file_exists($scriptfile)) {
-					$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Unable to find the gamemode file: "' . $setting->value . '"');
-				}
-			} else if ($setting->setting == self::SETTING_MODE_MAPLIST_FILE && $setting->value != "") {
-				$scriptfile = $this->maniaControl->getServer()->getDirectory()->getMapsFolder() ."MatchSettings" . DIRECTORY_SEPARATOR . $setting->value;
-				if (!file_exists($scriptfile)) {
-					$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Unable to find the Maplist file: "' . $setting->value . '"');
-				}
-			} else if ($setting->setting == self::SETTING_MATCH_POST_MATCH_MAPLIST && $setting->value != "") {
-				$scriptfile = $this->maniaControl->getServer()->getDirectory()->getMapsFolder() ."MatchSettings" . DIRECTORY_SEPARATOR . $setting->value;
-				if (!file_exists($scriptfile)) {
-					$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Unable to find the Post match Maplist file: "' . $setting->value . '"');
-				}
-			} else if ($setting->setting == self::SETTING_MODE_MAPS && $setting->value != "") {
-				$maps = explode(',', $setting->value);
-				foreach ($maps as $map) {
-					try {
-						$this->maniaControl->getClient()->getMapInfo($map);
-					} catch (\Exception $e) {
-						$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Unable to find the map: "' . $map . '"');
+			} else {
+				if ($setting->setting == self::SETTING_MATCH_GAMEMODE_BASE && in_array($setting->value, ['TMWC2023', 'TMWT2025', 'TMWTTeams']) && $this->maniaControl->getPluginManager()->getPlugin(self::MATCHMANAGERTMWTDUOINTEGRATION_PLUGIN) === null) {
+					$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . "It's highly recommanded to use the \"MatchManager TMWT Duo Integration\" plugin with TMWT based gamemodes.");
+				} else if ($setting->setting == self::SETTING_MATCH_CUSTOM_GAMEMODE && $setting->value != "") {
+					$scriptfile = $this->maniaControl->getServer()->getDirectory()->getUserDataFolder() . DIRECTORY_SEPARATOR . "Scripts" . DIRECTORY_SEPARATOR . "Modes" . DIRECTORY_SEPARATOR . $setting->value;
+					if (!file_exists($scriptfile)) {
+						$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Unable to find the gamemode file: "' . $setting->value . '"');
+					}
+				} else if ($setting->setting == self::SETTING_MODE_MAPLIST_FILE && $setting->value != "") {
+					$scriptfile = $this->maniaControl->getServer()->getDirectory()->getMapsFolder() ."MatchSettings" . DIRECTORY_SEPARATOR . $setting->value;
+					if (!file_exists($scriptfile)) {
+						$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Unable to find the Maplist file: "' . $setting->value . '"');
+					}
+				} else if ($setting->setting == self::SETTING_MATCH_POST_MATCH_MAPLIST && $setting->value != "") {
+					$scriptfile = $this->maniaControl->getServer()->getDirectory()->getMapsFolder() ."MatchSettings" . DIRECTORY_SEPARATOR . $setting->value;
+					if (!file_exists($scriptfile)) {
+						$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Unable to find the Post match Maplist file: "' . $setting->value . '"');
+					}
+				} else if ($setting->setting == self::SETTING_MODE_MAPS && $setting->value != "") {
+					$maps = explode(',', $setting->value);
+					foreach ($maps as $map) {
+						try {
+							$this->maniaControl->getClient()->getMapInfo($map);
+						} catch (\Exception $e) {
+							$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . 'Unable to find the map: "' . $map . '"');
+						}
 					}
 				}
 			}
 		}
 
-		if ($setting->setting === self::SETTING_MATCH_SETTINGS_MODE || $setting->setting === self::SETTING_MATCH_GAMEMODE_BASE || $setting->setting === self::SETTING_MATCH_CUSTOM_GAMEMODE) {
+		if ($setting === null || $setting->setting === self::SETTING_MATCH_SETTINGS_MODE || $setting->setting === self::SETTING_MATCH_GAMEMODE_BASE || $setting->setting === self::SETTING_MATCH_CUSTOM_GAMEMODE) {
 			$deletesettings = true;
 			if (defined("\ManiaControl\ManiaControl::ISTRACKMANIACONTROL") && $this->maniaControl->getSettingManager()->getSettingValue($this->maniaControl->getSettingManager(), SettingManager::SETTING_ALLOW_UNLINK_SERVER)) {
 				$deletesettings = !$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCH_DONT_DELETE_SETTINGS);
