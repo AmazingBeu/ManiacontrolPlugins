@@ -539,7 +539,7 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 			if (!in_array($player->login, $guests)) {
 				try {
 					Logger::log('Player "'. $player->nickname .'" kicked from the server as not guestlisted');
-					$this->maniaControl->getClient()->kick($player->nickname, "You are not guestlisted on the server");
+					$this->maniaControl->getClient()->kick($player->login, "You are not guestlisted on the server");
 					$kicked++;
 				} catch (\Throwable $th) {
 					Logger::logError("Can't kick ". $player->nickname .": ". $th->getMessage());
