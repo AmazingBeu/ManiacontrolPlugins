@@ -39,7 +39,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 2.4;
+	const PLUGIN_VERSION									= 2.5;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -110,10 +110,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	private $matchstatus			= "";
 	private $device_code			= "";
 	private $access_token			= "";
-	private $matchid				= "";
 	private $currentdatamode		= "";
-
-	private $playerlist				= array();
 
 	/**
 	 * @param \ManiaControl\ManiaControl $maniaControl
@@ -592,12 +589,12 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		}
 	}
 
-	private function getSheetName() {
+	private function getSheetName(string $matchid) {
 		$sheetname = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SHEETNAME);
 		$login = $this->maniaControl->getServer()->login;
 		$server_name = $this->maniaControl->getClient()->getServerName();
 
-		$sheetname = str_replace("#MATCHID#", $this->matchid, $sheetname);
+		$sheetname = str_replace("#MATCHID#", $matchid, $sheetname);
 		$sheetname = str_replace("#LOGIN#", $login, $sheetname);
 		$sheetname = str_replace("#NAME#", $server_name, $sheetname);
 		$sheetname = str_replace("#DATE#", date("Y-m-d"), $sheetname);
@@ -611,7 +608,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		$spreadsheetid = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET);
 		if ($spreadsheetid === "") return;
 
-		$sheetname = $this->getSheetName();
+		$sheetname = $this->getSheetName($matchid);
 		if ($sheetname === "") return;
 
 		foreach ($currentscore as $key => $score) {
@@ -779,11 +776,10 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 		$spreadsheetid = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_MATCHMANAGERGSHEET_SPREADSHEET);
 		if ($spreadsheetid === "") return;
 
-		$sheetname = $this->getSheetName();
+		$sheetname = $this->getSheetName($matchid);
 		if ($sheetname === "") return;
 
 		if ($this->refreshTokenIfNeeded()) {
-			$this->matchid = $matchid;
 			$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, 'https://sheets.googleapis.com/v4/spreadsheets/' . $spreadsheetid);
 			$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
 			$asyncHttpRequest->setHeaders(array("Authorization: Bearer " . $this->access_token));
