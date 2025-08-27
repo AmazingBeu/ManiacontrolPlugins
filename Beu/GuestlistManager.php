@@ -23,7 +23,7 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 	 * Constants
 	 */
 	const PLUGIN_ID			= 154;
-	const PLUGIN_VERSION	= 2.4;
+	const PLUGIN_VERSION	= 2.5;
 	const PLUGIN_NAME		= 'Guestlist Manager';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -288,7 +288,7 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 	public function handleLoad(Array $chat, Player $player) {
 		$guestlist = '';
 
-		$text = explode(" ",$chat[1][2]);
+		$text = explode(" ", $chat[1][2]);
 		if (count($text) > 1 && $text[1] != "") {
 			$guestlist = $text[1];
 
@@ -321,6 +321,8 @@ class GuestlistManager implements CommandListener, CallbackListener, TimerListen
 			$this->maniaControl->getChat()->sendError("Can't load guestlist: ". $th->getMessage(), $player);
 			Logger::logError("Can't load guestlist: ". $th->getMessage());
 		}
+
+		$this->addAdminsToGuestlist();
 	}
 
 	/**
