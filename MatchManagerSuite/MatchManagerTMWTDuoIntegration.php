@@ -37,7 +37,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 * Constants
 	 */
 	const PLUGIN_ID											= 211;
-	const PLUGIN_VERSION									= 1.2;
+	const PLUGIN_VERSION									= 1.3;
 	const PLUGIN_NAME										= 'MatchManager TMWT Duo Integration';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -326,9 +326,8 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 			$this->maniaControl->getClient()->setModeScriptSettings(['S_IsMatchmaking' => true], false);
 			$this->maniaControl->getClient()->restartMap();
 		} else if ($this->state === self::STATE_PREMATCH) {
-
 			$teamsUrl = $this->maniaControl->getSettingManager()->getSettingValue($this->MatchManagerCore, 'S_TeamsUrl');
-			if ($teamsUrl !== '') {
+			if ($teamsUrl !== null && $teamsUrl !== '') {
 				$response = WebReader::getUrl($teamsUrl);
 				$content  = $response->getContent();
 				$json = json_decode($content);
@@ -416,19 +415,23 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	
 				$mapUids = array_column($json->playlist, 'uid');
 
-				$order = explode(',', $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_PICKANDBAN_OVERRIDEMAPORDER));
+				$mapOrderSetting = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_PICKANDBAN_OVERRIDEMAPORDER);
 
-				if (count($order) === count($mapUids)) {
-					$this->log("Re-ordering maps");
-					try {
-						$orderedMapUid = [];
-						foreach ($order as $number) {
-							$orderedMapUid[] = $mapUids[$number - 1];
+				if ($mapOrderSetting !== '') {
+					$order = array_map('trim', explode(',', $mapOrderSetting));
+
+					if (count($order) === count($mapUids)) {
+						$this->log("Re-ordering maps");
+						try {
+							$orderedMapUid = [];
+							foreach ($order as $number) {
+								$orderedMapUid[] = $mapUids[$number - 1];
+							}
+							$mapUids = $orderedMapUid;
+						} catch (\Throwable $th) {
+							$this->logError("Invalid Map order setting");
+							$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() ."Invalid Map order setting");
 						}
-						$mapUids = $orderedMapUid;
-					} catch (\Throwable $th) {
-						$this->logError("Invalid Map order setting");
-						$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() ."Invalid Map order setting");
 					}
 				}
 
