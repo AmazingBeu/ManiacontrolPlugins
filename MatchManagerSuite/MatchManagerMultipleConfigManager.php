@@ -44,7 +44,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 * Constants
 	 */
 	const PLUGIN_ID											= 171;
-	const PLUGIN_VERSION									= 1.7;
+	const PLUGIN_VERSION									= 1.8;
 	const PLUGIN_NAME										= 'MatchManager Multiple Config Manager';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -68,6 +68,8 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 
 	const CB_LOADCONFIG										= 'MatchManager.MultiConfigManager.LoadConfig';
 	const CB_SAVECONFIG										= 'MatchManager.MultiConfigManager.SaveConfig';
+
+	const SETTING_ENABLE_PLUGINS_WHEN_LOADING            	= 'Enable installed plugins when loading config';
 
 	/*
 	 * Private properties
@@ -132,6 +134,8 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 		if ($this->MatchManagerCore == Null) {
 			throw new \Exception('MatchManager Core is needed to use MatchManager Players Pause plugin');
 		}
+
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_ENABLE_PLUGINS_WHEN_LOADING, false, 'Enable installed plugins when loading config');
 
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::AFTERINIT, $this, 'handleAfterInit');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_LOADED, $this, 'handlePluginLoaded');
@@ -335,22 +339,34 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 			if ($allconfigs != null) {
 				$this->log("Loading config: " . $id);
 				$someconfignotloaded = false;
-				foreach ($allconfigs as $plugin => $configs) {
-					$pluginclass = $this->maniaControl->getPluginManager()->getPlugin($plugin);
-					if ($pluginclass != null) {
-						foreach ($configs as $name => $value) {
-							// When loading setting, cache could be wrong compared to the data stored in the database. So force clear everytime to be sure to have the good value
-							$this->maniaControl->getSettingManager()->clearStorage();
-							$setting = $this->maniaControl->getSettingManager()->getSettingObject($pluginclass, $name);
-							if ($setting != null) {
-								if ($setting->value != $value) {
-									$this->log("Saving new setting " . $name);
-									$setting->value = $value;
-									$this->maniaControl->getSettingManager()->saveSetting($setting);
+				$pluginClasses = $this->maniaControl->getPluginManager()->getPluginClasses();
+				$enablePlugins = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ENABLE_PLUGINS_WHEN_LOADING);
+				foreach ($allconfigs as $pluginClass => $configs) {
+					if ($pluginClass === get_class($this)) continue;
+					$plugin = $this->maniaControl->getPluginManager()->getPlugin($pluginClass);
+
+					if (in_array($pluginClass, $pluginClasses, true)) {
+						if ($plugin === null && $enablePlugins) {
+							$this->log("Loading plugin " . $pluginClass);
+							$this->maniaControl->getPluginManager()->activatePlugin($pluginClass);
+							$plugin = $this->maniaControl->getPluginManager()->getPlugin($pluginClass);
+						}
+
+						if ($plugin !== null) {
+							foreach ($configs as $name => $value) {
+								// When loading setting, cache could be wrong compared to the data stored in the database. So force clear everytime to be sure to have the good value
+								$this->maniaControl->getSettingManager()->clearStorage();
+								$setting = $this->maniaControl->getSettingManager()->getSettingObject($plugin, $name);
+								if ($setting != null) {
+									if ($setting->value != $value) {
+										$this->log("Saving new setting " . $name);
+										$setting->value = $value;
+										$this->maniaControl->getSettingManager()->saveSetting($setting);
+									}
+								} else {
+									$someconfignotloaded = true;
+									$this->log("Unable to load setting: " . $name);
 								}
-							} else {
-								$someconfignotloaded = true;
-								$this->log("Unable to load setting: " . $name);
 							}
 						}
 					}
@@ -625,6 +641,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 		$plugins = $this->maniaControl->getSettingManager()->getSettingClasses();
 
 		foreach ($plugins as $class) {
+			if ($class === get_class($this)) continue;
 			if (strpos($class, "MatchManagerSuite\\") !== 0) {
 				continue;
 			}
