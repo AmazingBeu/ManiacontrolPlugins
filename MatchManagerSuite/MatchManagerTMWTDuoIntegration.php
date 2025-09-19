@@ -37,7 +37,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 * Constants
 	 */
 	const PLUGIN_ID											= 211;
-	const PLUGIN_VERSION									= 1.3;
+	const PLUGIN_VERSION									= 1.4;
 	const PLUGIN_NAME										= 'MatchManager TMWT Duo Integration';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -59,6 +59,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	const XMLRPC_METHOD_MATCHSTARTED						= 'Club.Match.Start';
 	const XMLRPC_METHOD_MATCHCOMPLETED						= 'Club.Match.Completed';
 
+	const SETTING_ENABLED 									= 'Plugin Enabled';
 	const SETTING_TEAM1 									= 'Team 1 Id';
 	const SETTING_TEAM2 									= 'Team 2 Id';
 	const SETTING_PICKANDBAN_ENABLE 						= 'Enable Pick & Ban';
@@ -138,6 +139,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 		}
 
 		// Settings
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_ENABLED, true, '', 5);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_TEAM1, '', '', 10);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_TEAM2, '', '', 10);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_PICKANDBAN_ENABLE, false, '', 20);
@@ -243,6 +245,13 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 * @return bool 
 	 */
 	public function canStartMatch() {
+		if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ENABLED)) return true;
+
+		if (!in_array($this->MatchManagerCore::SETTING_MATCH_GAMEMODE_BASE, ['TMWC2023', 'TMWT2025', 'TMWTTeams'])) {
+			$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() . "TMWT Duo Integration require a TMWT / TMWC Gamemode base.");
+			return false;
+		}
+
 		if ($this->maniaControl->getSettingManager()->getSettingValue($this->MatchManagerCore, 'S_TeamsUrl') === '') {
 			$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() . "S_TeamsUrl must be defined");
 			return false;
@@ -271,6 +280,8 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 * @return void 
 	 */
 	public function handleMatchManagerStartMatch() {
+		if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ENABLED)) return;
+
 		$this->state = self::STATE_PRESETTING;
 
 		$setting = $this->maniaControl->getSettingManager()->getSettingObject($this->MatchManagerCore, 'S_IsMatchmaking');
@@ -307,6 +318,8 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 * @return void 
 	 */
 	public function handleStartMatchStartCallback() {
+		if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ENABLED)) return;
+
 		if ($this->MatchManagerCore->getMatchStatus() && $this->state === self::STATE_PREMATCH) {
 			// reset match state in just in case
 			$this->maniaControl->getClient()->triggerModeScriptEvent(self::XMLRPC_METHOD_MATCHCOMPLETED, []);
@@ -319,6 +332,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 * @return void 
 	 */
 	public function handleStartMapStartCallback() {
+		if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ENABLED)) return;
 		if (!$this->MatchManagerCore->getMatchStatus()) return;
 
 		if ($this->state === self::STATE_PRESETTING) {
@@ -406,6 +420,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 * @return void 
 	 */
 	public function handlePickAndBanComplete(array $structure) {
+		if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ENABLED)) return;
 		if (!$this->MatchManagerCore->getMatchStatus()) return;
 		$this->log('Received picks: '. $structure[1][0]);
 
@@ -486,6 +501,8 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 * @return void 
 	 */
 	public function handleSettingChanged(Setting $setting) {
+		if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ENABLED)) return;
+
 		if ($setting->setting === self::SETTING_PICKANDBAN_ENABLE || $setting->setting === $this->MatchManagerCore::SETTING_MATCH_SETTINGS_MODE) {
 			if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_PICKANDBAN_ENABLE)) {
 				if ($this->maniaControl->getSettingManager()->getSettingValue($this->MatchManagerCore, $this->MatchManagerCore::SETTING_MATCH_SETTINGS_MODE) !== "All from the plugin") {
