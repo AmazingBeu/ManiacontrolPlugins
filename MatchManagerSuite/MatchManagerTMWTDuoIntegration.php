@@ -37,7 +37,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 * Constants
 	 */
 	const PLUGIN_ID											= 211;
-	const PLUGIN_VERSION									= 1.4;
+	const PLUGIN_VERSION									= 1.5;
 	const PLUGIN_NAME										= 'MatchManager TMWT Duo Integration';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -247,7 +247,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	public function canStartMatch() {
 		if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_ENABLED)) return true;
 
-		if (!in_array($this->MatchManagerCore::SETTING_MATCH_GAMEMODE_BASE, ['TMWC2023', 'TMWT2025', 'TMWTTeams'])) {
+		if (!in_array($this->maniaControl->getSettingManager()->getSettingValue($this->MatchManagerCore, $this->MatchManagerCore::SETTING_MATCH_GAMEMODE_BASE), ['TMWC2023', 'TMWT2025', 'TMWTTeams'])) {
 			$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() . "TMWT Duo Integration require a TMWT / TMWC Gamemode base.");
 			return false;
 		}
