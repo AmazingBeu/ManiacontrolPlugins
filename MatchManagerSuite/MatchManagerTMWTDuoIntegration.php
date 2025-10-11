@@ -345,6 +345,8 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 				$response = WebReader::getUrl($teamsUrl);
 				$content  = $response->getContent();
 				$json = json_decode($content);
+				$this->log(count($json). 'teams loaded');
+				var_dump($content);
 				if ($json !== null) {
 					$team1 = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM1);
 					$team2 = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM2);
