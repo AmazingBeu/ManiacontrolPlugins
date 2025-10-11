@@ -256,6 +256,9 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 			$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() . "S_TeamsUrl must be defined");
 			return false;
 		}
+
+		var_dump($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM1), $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM2));
+
 		if (
 			$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM1) === '' ||
 			$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM2) === ''
@@ -345,11 +348,13 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 				$response = WebReader::getUrl($teamsUrl);
 				$content  = $response->getContent();
 				$json = json_decode($content);
-				$this->log(count($json). 'teams loaded');
+				$this->log(count($json). ' teams loaded');
 				var_dump($content);
 				if ($json !== null) {
 					$team1 = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM1);
 					$team2 = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM2);
+
+					var_dump($team1, $team2);
 
 					foreach ($json as $team) {
 						if ($team->Id === $team1) {
