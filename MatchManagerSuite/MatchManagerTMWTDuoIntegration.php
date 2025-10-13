@@ -37,7 +37,7 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 	 * Constants
 	 */
 	const PLUGIN_ID											= 211;
-	const PLUGIN_VERSION									= 1.5;
+	const PLUGIN_VERSION									= 1.6;
 	const PLUGIN_NAME										= 'MatchManager TMWT Duo Integration';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -257,8 +257,6 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 			return false;
 		}
 
-		var_dump($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM1), $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM2));
-
 		if (
 			$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM1) === '' ||
 			$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM2) === ''
@@ -339,22 +337,23 @@ class MatchManagerTMWTDuoIntegration implements CallbackListener, ManialinkPageA
 		if (!$this->MatchManagerCore->getMatchStatus()) return;
 
 		if ($this->state === self::STATE_PRESETTING) {
+			$this->log('Applying S_IsMatchmaking setting to true');
 			$this->state = self::STATE_PREMATCH;
 			$this->maniaControl->getClient()->setModeScriptSettings(['S_IsMatchmaking' => true], false);
 			$this->maniaControl->getClient()->restartMap();
 		} else if ($this->state === self::STATE_PREMATCH) {
 			$teamsUrl = $this->maniaControl->getSettingManager()->getSettingValue($this->MatchManagerCore, 'S_TeamsUrl');
 			if ($teamsUrl !== null && $teamsUrl !== '') {
+				$this->log('Fetching S_TeamsUrl config at '. $teamsUrl);
 				$response = WebReader::getUrl($teamsUrl);
 				$content  = $response->getContent();
 				$json = json_decode($content);
-				$this->log(count($json). ' teams loaded');
-				var_dump($content);
+				$this->log(count($json). ' teams fetched');
 				if ($json !== null) {
 					$team1 = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM1);
 					$team2 = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_TEAM2);
 
-					var_dump($team1, $team2);
+					$this->log('Parsing S_TeamsUrl config to add players of the teams '. $team1 .' & '. $team2);
 
 					foreach ($json as $team) {
 						if ($team->Id === $team1) {
