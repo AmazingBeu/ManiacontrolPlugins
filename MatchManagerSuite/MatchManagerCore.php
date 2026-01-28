@@ -43,7 +43,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * MARK: Constants
 	 */
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 6.1;
+	const PLUGIN_VERSION									= 6.2;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -752,9 +752,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	public function resetMatchVariables() {
 		$this->log("Reset match variables");
 		$this->matchStarted		 = false;
-		$this->matchrecover		 = false;
 		$this->pauseon			 = false;
-		$this->pointstorecover	 = array();
 		$this->currentscore		 = array();
 		$this->currentteamsscore = array();
 		$this->preendroundscore	 = null;
@@ -774,6 +772,10 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 		$this->currentgmbase		= "";
 		$this->currentcustomgm		= "";
 		$this->currentsettingmode	= "";
+
+		// These values are not reset here because needed changed before the matchstart
+		//$this->matchrecover		 = false;
+		//$this->pointstorecover	 = array();
 	}
 	/**
 	 * Add items in AdminUI plugin
@@ -1310,7 +1312,6 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 				'mapshidden'	=> $this->mapshidden,
 				'maps'			=> $this->maps];
 			$this->maniaControl->getCallbackManager()->triggerCallback(self::CB_MATCHMANAGER_STARTMATCH, $this->matchid, $settings);
-			$this->updateAdminUIMenuItems();
 
 			$this->log("Skip map");
 			$this->maniaControl->getMapManager()->getMapActions()->skipMap();
@@ -1319,6 +1320,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 			$this->logError("Can't start the match: ". $e->getMessage());
 			$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . "Can't start the match: ". $e->getMessage());
 		}
+		$this->updateAdminUIMenuItems();
 	}
 
 	/**
@@ -1407,12 +1409,14 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 			$this->resetMatchVariables();
 			$this->postmatch = true;
+			$this->matchrecover = false;
+			$this->pointstorecover = [];
 
-			$this->updateAdminUIMenuItems();
 		} catch (Exception $e) {
 			$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . "Can't finish the match: " . $e->getMessage());
 			$this->logError("Can't finish the match: ". $e->getMessage());
 		}
+		$this->updateAdminUIMenuItems();
 	}
 
 	/**
@@ -1457,14 +1461,15 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 			$this->resetMatchVariables();
 			$this->postmatch = true;
-
-			$this->updateAdminUIMenuItems();
+			$this->matchrecover = false;
+			$this->pointstorecover = [];
 		} catch (Exception $e) {
 			$this->maniaControl->getChat()->sendErrorToAdmins(self::CHAT_PREFIX . "Can't stop the match: " . $e->getMessage());
 			$this->logError("Can't stop the match: ". $e->getMessage());
 		}
 		$this->log("Restarting map to load Gamemode");
 		$this->maniaControl->getClient()->restartMap();
+		$this->updateAdminUIMenuItems();
 	}
 
 	/**
@@ -1528,14 +1533,14 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 					$array[] = $row;
 				}
 				if (isset($array[0])) {
-					$this->matchrecover = true;
 					foreach ($array as $index => $value) {
 						if (isset($value['login'])) {
 							$this->pointstorecover[$value['login']] = $value['matchpoints'];
 						}
 					}
-					$this->maniaControl->getChat()->sendSuccess(self::CHAT_PREFIX . 'Recovering the match: ' . $matchid );
+					$this->maniaControl->getChat()->sendSuccess(self::CHAT_PREFIX . 'Recovering the match: ' . $matchid);
 					$this->log('Recovering the match: ' . $matchid);
+					$this->log('Points to recover: '. print_r($this->pointstorecover, true));
 					$this->MatchStart();
 					return true;
 				} else {
@@ -1555,6 +1560,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * Function called to recover points
 	 */
 	private function recoverPoints() {
+		$this->log('Points to recover: '. print_r($this->pointstorecover, true));
 		if (!empty($this->pointstorecover)) {
 			if ($this->currentgmbase == "Teams") {
 				// Blue Team
