@@ -39,7 +39,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 156;
-	const PLUGIN_VERSION									= 2.5;
+	const PLUGIN_VERSION									= 2.6;
 	const PLUGIN_NAME										= 'MatchManager GSheet';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -217,7 +217,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * 
 	 * @param mixed $message
 	 */
-	private function log(mixed $message) {
+	private function log($message) {
 		Logger::log(self::LOG_PREFIX . $message);
 	}
 
@@ -226,7 +226,7 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 	 * 
 	 * @param mixed $message
 	 */
-	private function logError(mixed $message) {
+	private function logError($message) {
 		Logger::logError(self::LOG_PREFIX . $message);
 	}
 
@@ -391,8 +391,14 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				return;
 			}
 			if (property_exists($data, "error")) {
-				$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
-				$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
+				$error = 'Unknown error';
+				if (is_string($data->error)) {
+					$error = $data->error;
+				} else if (is_object($data->error) && property_exists($data->error, 'message') && property_exists($data->error, 'code')) {
+					$error = $data->error->code . " ". $data->error->message;
+				}
+				$this->logError('Request error: ' . $error);
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' .$error);
 				return;
 			}
 			if (isset($data->device_code)) {
@@ -446,8 +452,14 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 				return;
 			}
 			if (property_exists($data, "error")) {
-				$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
-				$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
+				$error = 'Unknown error';
+				if (is_string($data->error)) {
+					$error = $data->error;
+				} else if (is_object($data->error) && property_exists($data->error, 'message') && property_exists($data->error, 'code')) {
+					$error = $data->error->code . " ". $data->error->message;
+				}
+				$this->logError('Request error: ' . $error);
+				$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' .$error);
 				return;
 			}
 
@@ -493,8 +505,14 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					return;
 				}
 				if (property_exists($data, "error")) {
-					$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
-					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
+					$error = 'Unknown error';
+					if (is_string($data->error)) {
+						$error = $data->error;
+					} else if (is_object($data->error) && property_exists($data->error, 'message') && property_exists($data->error, 'code')) {
+						$error = $data->error->code . " ". $data->error->message;
+					}
+					$this->logError('Request error: ' . $error);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' .$error);
 					return;
 				}
 
@@ -571,8 +589,14 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					return;
 				}
 				if (property_exists($data, "error")) {
-					$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
-					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
+					$error = 'Unknown error';
+					if (is_string($data->error)) {
+						$error = $data->error;
+					} else if (is_object($data->error) && property_exists($data->error, 'message') && property_exists($data->error, 'code')) {
+						$error = $data->error->code . " ". $data->error->message;
+					}
+					$this->logError('Request error: ' . $error);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' .$error);
 					return;
 				}
 
@@ -663,8 +687,14 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					return;
 				}
 				if (property_exists($data, "error")) {
-					$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
-					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
+					$error = 'Unknown error';
+					if (is_string($data->error)) {
+						$error = $data->error;
+					} else if (is_object($data->error) && property_exists($data->error, 'message') && property_exists($data->error, 'code')) {
+						$error = $data->error->code . " ". $data->error->message;
+					}
+					$this->logError('Request error: ' . $error);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' .$error);
 					return;
 				}
 
@@ -697,8 +727,14 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 							return;
 						}
 						if (property_exists($data, "error")) {
-							$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
-							$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
+							$error = 'Unknown error';
+							if (is_string($data->error)) {
+								$error = $data->error;
+							} else if (is_object($data->error) && property_exists($data->error, 'message') && property_exists($data->error, 'code')) {
+								$error = $data->error->code . " ". $data->error->message;
+							}
+							$this->logError('Request error: ' . $error);
+							$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' .$error);
 							return;
 						}
 
@@ -732,8 +768,14 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 									return;
 								}
 								if (property_exists($data, "error")) {
-									$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
-									$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
+									$error = 'Unknown error';
+									if (is_string($data->error)) {
+										$error = $data->error;
+									} else if (is_object($data->error) && property_exists($data->error, 'message') && property_exists($data->error, 'code')) {
+										$error = $data->error->code . " ". $data->error->message;
+									}
+									$this->logError('Request error: ' . $error);
+									$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' .$error);
 									return;
 								}
 
@@ -796,8 +838,14 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					return;
 				}
 				if (property_exists($data, "error")) {
-					$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
-					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
+					$error = 'Unknown error';
+					if (is_string($data->error)) {
+						$error = $data->error;
+					} else if (is_object($data->error) && property_exists($data->error, 'message') && property_exists($data->error, 'code')) {
+						$error = $data->error->code . " ". $data->error->message;
+					}
+					$this->logError('Request error: ' . $error);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' .$error);
 					return;
 				}
 
@@ -944,8 +992,14 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 					return;
 				}
 				if (property_exists($data, "error")) {
-					$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
-					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
+					$error = 'Unknown error';
+					if (is_string($data->error)) {
+						$error = $data->error;
+					} else if (is_object($data->error) && property_exists($data->error, 'message') && property_exists($data->error, 'code')) {
+						$error = $data->error->code . " ". $data->error->message;
+					}
+					$this->logError('Request error: ' . $error);
+					$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' .$error);
 					return;
 				}
 
@@ -967,8 +1021,14 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 						return;
 					}
 					if (property_exists($data, "error")) {
-						$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
-						$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' . $data->error->code . " ". $data->error->message);
+						$error = 'Unknown error';
+						if (is_string($data->error)) {
+							$error = $data->error;
+						} else if (is_object($data->error) && property_exists($data->error, 'message') && property_exists($data->error, 'code')) {
+							$error = $data->error->code . " ". $data->error->message;
+						}
+						$this->logError('Request error: ' . $error);
+						$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' .$error);
 						return;
 					}
 
@@ -1007,8 +1067,14 @@ class MatchManagerGSheet implements  CallbackListener, TimerListener, CommandLis
 							return;
 						}
 						if (property_exists($data, "error")) {
-							$this->logError('Request error: ' . $data->error->code . " ". $data->error->message);
-							$this->maniaControl->getChat()->sendErrorToAdmins('$this->MatchManagerCore->getChatPrefix() .Request error: ' . $data->error->code . " ". $data->error->message);
+							$error = 'Unknown error';
+							if (is_string($data->error)) {
+								$error = $data->error;
+							} else if (is_object($data->error) && property_exists($data->error, 'message') && property_exists($data->error, 'code')) {
+								$error = $data->error->code . " ". $data->error->message;
+							}
+							$this->logError('Request error: ' . $error);
+							$this->maniaControl->getChat()->sendErrorToAdmins($this->MatchManagerCore->getChatPrefix() .'Request error: ' .$error);
 							return;
 						}
 
