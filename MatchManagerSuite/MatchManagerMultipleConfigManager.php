@@ -44,7 +44,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 	 * Constants
 	 */
 	const PLUGIN_ID											= 171;
-	const PLUGIN_VERSION									= 1.8;
+	const PLUGIN_VERSION									= 1.9;
 	const PLUGIN_NAME										= 'MatchManager Multiple Config Manager';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -516,7 +516,7 @@ class MatchManagerMultipleConfigManager implements ManialinkPageAnswerListener, 
 		$pageFrame = null;
 
 		foreach ($this->getSavedConfigs() as $config) {
-			if ($index % 16 === 0) {
+			if ($index % (floor(($height - 20.) / 4)) === 0) {
 				$pageFrame = new Frame();
 				$frame->addChild($pageFrame);
 				$posY = $height / 2 - 10;
