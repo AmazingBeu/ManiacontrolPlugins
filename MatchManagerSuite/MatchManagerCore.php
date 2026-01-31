@@ -43,7 +43,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 	 * MARK: Constants
 	 */
 	const PLUGIN_ID											= 152;
-	const PLUGIN_VERSION									= 6.2;
+	const PLUGIN_VERSION									= 6.3;
 	const PLUGIN_NAME										= 'MatchManager Core';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -1070,7 +1070,7 @@ class MatchManagerCore implements CallbackListener, CommandListener, TimerListen
 
 		foreach ($gameSettings as $settingname => $info) {
 			$gameSettings[$settingname]['value'] = $this->maniaControl->getSettingManager()->getSettingValue($this, $settingname);
-			if ($gameSettings[$settingname]['value'] == null) {
+			if ($gameSettings[$settingname]['value'] === null) {
 				$gameSettings[$settingname]['value'] = $info['default'];
 			}
 			settype($gameSettings[$settingname]['value'], $info['type']);
