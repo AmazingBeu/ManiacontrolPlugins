@@ -6,8 +6,10 @@ use ManiaControl\Plugins\Plugin;
 use ManiaControl\Logger;
 use ManiaControl\Callbacks\CallbackListener;
 use ManiaControl\Callbacks\Callbacks;
+use ManiaControl\Callbacks\Structures\Common\StatusCallbackStructure;
 use ManiaControl\Callbacks\Structures\ManiaPlanet\StartEndStructure;
 use ManiaControl\Callbacks\Structures\TrackMania\OnScoresStructure;
+use ManiaControl\Callbacks\Structures\TrackMania\OnStartLineEventStructure;
 use ManiaControl\Files\AsyncHttpRequest;
 
 use ManiaControl\Callbacks\Structures\TrackMania\OnWayPointEventStructure;
@@ -34,7 +36,7 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 	* Constants
 	*/
 	const PLUGIN_ID			= 213;
-	const PLUGIN_VERSION	= 1.1;
+	const PLUGIN_VERSION	= 1.2;
 	const PLUGIN_NAME		= 'MatchManager eCircuitMania';
 	const PLUGIN_AUTHOR		= 'Beu';
 
@@ -48,6 +50,7 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 	const SETTING_URL					= 'API URL';
 	const SETTING_MATCH_API_KEY			= 'Match API Key';
 	const SETTING_WITHMATCHMANAGER		= 'Only send data when a Match Manager match is running';
+	const SETTING_SENDROUNDTIME			= 'Send Round Time request (On Driver Finish)';
 
 	const CB_STARTMAP					= 'Maniaplanet.StartMap_Start';
 
@@ -56,8 +59,9 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 	 */
 	private ManiaControl $maniaControl;
 	private \MatchManagerSuite\MatchManagerCore $MatchManagerCore;
-	private int $trackNum = 0;
-	private int $roundNum = 0;
+	private bool $pause = false;
+	private bool $warmUp = false;
+	private array $spawnedPlayersTime = [];
 
 	/**
 	 * @see \ManiaControl\Plugins\Plugin::prepare()
@@ -117,10 +121,17 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 
 				$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_LOADED, $this, 'handlePluginLoaded');
 				$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_UNLOADED, $this, 'handlePluginUnloaded');
-				$this->maniaControl->getCallbackManager()->registerScriptCallbackListener(self::CB_STARTMAP, $this, 'handleStartMap');
-				$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_STARTROUNDSTART, $this, 'handleStartRound');
+
+				$this->maniaControl->getCallbackManager()->registerCallbackListener($this->MatchManagerCore::CB_MATCHMANAGER_STARTMATCH, $this, 'handleStartMatch');
+				$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_WARMUPSTARTROUND, $this, 'handleStartWarmUp');
+				$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_WARMUPEND, $this, 'handleEndWarmUp');
+				$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_PAUSE_STATUS, $this, 'handlePauseStatus');
+				
+				$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_ONEVENTSTARTLINE, $this, 'handleStartLine');
+
 				$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_ONWAYPOINT, $this, 'handleOnWaypoint');
 				$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::TM_SCORES, $this, 'handleTrackmaniaScores');
+				$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_STARTROUNDSTART, $this, 'handleStartRound');
 				$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::MP_ENDROUNDEND, $this, 'handleEndRound');
 
 				$this->updateAdminUIMenuItems();
@@ -131,6 +142,7 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_MATCH_API_KEY, "", "", 5);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_URL, "https://us-central1-fantasy-trackmania.cloudfunctions.net", "", 10);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_SENDROUNDTIME, true, "Only used for overlays live updating.", 20);
 
 		$this->maniaControl->getManialinkManager()->registerManialinkPageAnswerListener(self::ML_ACTION_OPENSETTINGS, $this, 'handleActionOpenSettings');
 	}
@@ -217,40 +229,62 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 		$this->maniaControl->getConfigurator()->showMenu($player, $pluginMenu);
 	}
 
-	public function handleStartMap(array $structure) {
-		if (!$this->MatchManagerCore->getMatchIsRunning()) return;
-		$data = json_decode($structure[1][0]);
-
-		$this->trackNum = $data->valid;
-		$this->roundNum = 0;
+	public function handleStartMatch() {
+		$this->log("Starting match, clearing stored data.");
+		$this->pause = false;
+		$this->warmUp = false;
+		$this->spawnedPlayersTime = [];
 	}
 
-	public function handleStartRound(StartEndStructure $structure) {
+	public function handleStartWarmUp() {
 		if (!$this->MatchManagerCore->getMatchIsRunning()) return;
-		$this->roundNum = $structure->getValidRoundCount();
+		$this->log("WarmUp status changed to: active");
+		$this->warmUp = true;
+	}
+
+	public function handleEndWarmUp() {
+		if (!$this->MatchManagerCore->getMatchIsRunning()) return;
+		$this->log("WarmUp status changed to: inactive");
+		$this->warmUp = false;
+	}
+
+	public function handlePauseStatus(StatusCallbackStructure $structure) {
+		if (!$this->MatchManagerCore->getMatchIsRunning()) return;
+		if ($this->pause === $structure->getActive()) return; // Callback is sent at each round start, skipping useless log
+		$this->log("Pause status changed to: ". ($structure->getActive() ? 'active' : 'inactive'));
+		$this->pause = $structure->getActive();
+	}
+
+	public function handleStartRound() {
+		$this->spawnedPlayersTime = [];
+	}
+
+	public function handleStartLine(OnStartLineEventStructure $structure) {
+		$this->spawnedPlayersTime[$structure->getPlayer()->getAccountId()] = null;
 	}
 
 	public function handleOnWaypoint(OnWayPointEventStructure $structure) {
 		if (!$this->MatchManagerCore->getMatchIsRunning()) return;
+		if ($this->pause || $this->warmUp) return;
 		if (!$structure->getIsEndRace()) return;
-		if ($this->roundNum <= 0) return; // probably during the WU
+		if (!$this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_SENDROUNDTIME)) return;
+		if (!array_key_exists($structure->getPlayer()->getAccountId(), $this->spawnedPlayersTime)) return;
 
 		$mapuid = "";
 		$map = $this->maniaControl->getMapManager()->getCurrentMap();
 		if ($map !== null) {
 			$mapuid = $map->uid;
 		}
-		
+
 		$payload = json_encode([
 			"ubisoftUid" => $structure->getPlayer()->getAccountId(),
 			"finishTime" => $structure->getRaceTime(),
-			"mapId" => $mapuid,
-			"trackNum" => $this->trackNum,
-			"roundNum" => $this->roundNum
+			"mapId" => $mapuid
 		]);
 
 		$request = $this->getAPIRequest("/match-addRoundTime");
 		if ($request !== null) {
+			$this->log("Starting 'addRoundTime' request with '". $payload ."'");
 			$request->setContent($payload)->setCallable(function ($content, $error, $headers) use ($payload) {
 				if ($content !== "Created" || $error !== null) {
 					$this->logError("Error on the 'addRoundTime' request. answer: " . $content . " / error: " . $error . " / payload: " . $payload);
@@ -263,88 +297,85 @@ class MatchManagerECircuitMania implements CallbackListener, ManialinkPageAnswer
 		if (!$this->MatchManagerCore->getMatchIsRunning()) return;
 		if ($structure->getSection() !== "PreEndRound") return;
 
-		$scores = [];
+		$this->log("Scores received, storing data for future request.");
 		foreach ($structure->getPlayerScores() as $playerscore) {
-			$scores[] = $playerscore;
-		}
-
-		/** @var \ManiaControl\Callbacks\Structures\TrackMania\Models\PlayerScore[] $scores */
-		usort($scores, function ($a, $b) {
-			if ($a->getPrevRaceTime() === -1 && $b->getPrevRaceTime() === -1) {
-				return $b->getRoundPoints() - $a->getRoundPoints();
-			}
-
-			if ($a->getPrevRaceTime() === -1) return 1;
-			if ($b->getPrevRaceTime() === -1) return -1;
-
-			if ($a->getPrevRaceTime() === $b->getPrevRaceTime()) {
-				$acheckpoints = $a->getPrevRaceCheckpoints();
-				$bcheckpoints = $b->getPrevRaceCheckpoints();
-
-				while (end($acheckpoints) === end($bcheckpoints)) {
-					if (count($acheckpoints) === 0 || count($bcheckpoints) === 0) return 0;
-					array_pop($acheckpoints);
-					array_pop($bcheckpoints);
-				}
-				return end($acheckpoints) - end($bcheckpoints);
-			}
-			return $a->getPrevRaceTime() - $b->getPrevRaceTime();
-		});
-
-		$players = [];
-		$rank = 1;
-		foreach ($scores as $playerscore) {
-			/** @var \ManiaControl\Callbacks\Structures\TrackMania\Models\PlayerScore $playerscore */
-			if ($playerscore->getPlayer()->isSpectator) continue;
-
-			$players[] = [
-				"ubisoftUid" => $playerscore->getPlayer()->getAccountId(),
-				"finishTime" => $playerscore->getPrevRaceTime(),
-				"position" => $rank
-			];
-			$rank++;
-		}
-
-		$mapuid = "";
-		$map = $this->maniaControl->getMapManager()->getCurrentMap();
-		if ($map !== null) {
-			$mapuid = $map->uid;
-		}
-
-		$payload = json_encode([
-			"players" => $players,
-			"mapId" => $mapuid,
-			"trackNum" => $this->trackNum,
-			"roundNum" => $this->roundNum
-		]);
-
-		$request = $this->getAPIRequest("/match-addRound");
-		if ($request !== null) {
-			$request->setContent($payload)->setCallable(function ($content, $error, $headers) use ($payload) {
-				if ($content !== "Created" || $error !== null) {
-					$this->logError("Error on the 'addRound' request. answer: " . $content . " / error: " . $error . " / payload: " . $payload);
-				}
-			})->postData();
+			if (!array_key_exists($playerscore->getPlayer()->getAccountId(), $this->spawnedPlayersTime)) continue;
+			$this->spawnedPlayersTime[$playerscore->getPlayer()->getAccountId()] = $playerscore;
 		}
 	}
 
 	public function handleEndRound(StartEndStructure $structure) {
 		if (!$this->MatchManagerCore->getMatchIsRunning()) return;
 		$json = $structure->getPlainJsonObject();
-		if (!property_exists($json, 'isvalid') || $json->isvalid) return;
+		if (property_exists($json, 'isvalid') && $json->isvalid) {
 
-		$payload = json_encode([
-			"trackNum" => $this->trackNum,
-			"roundNum" => $this->roundNum
-		]);
-
-		$request = $this->getAPIRequest("/match-removeRound");
-		if ($request !== null) {
-			$request->setContent($payload)->setCallable(function ($content, $error, $headers) use ($payload) {
-				if ($content !== "Created" || $error !== null) {
-					$this->logError("Error on the 'removeRound' request. answer: " . $content . " / error: " . $error . " / payload: " . $payload);
+			// Clear players that are not in the TrackmaniaScores (should never happen)
+			foreach ($this->spawnedPlayersTime as $accountId => $playerscore) {
+				if ($playerscore === null) {
+					unset($this->spawnedPlayersTime[$accountId]);
 				}
-			})->postData();
+			}
+
+			/** @var \ManiaControl\Callbacks\Structures\TrackMania\Models\PlayerScore[] $scores */
+			usort($this->spawnedPlayersTime, function ($a, $b) {
+				if ($a->getPrevRaceTime() === -1 && $b->getPrevRaceTime() === -1) {
+					return $b->getRoundPoints() - $a->getRoundPoints();
+				}
+
+				if ($a->getPrevRaceTime() === -1) return 1;
+				if ($b->getPrevRaceTime() === -1) return -1;
+
+				if ($a->getPrevRaceTime() === $b->getPrevRaceTime()) {
+					$acheckpoints = $a->getPrevRaceCheckpoints();
+					$bcheckpoints = $b->getPrevRaceCheckpoints();
+
+					while (end($acheckpoints) === end($bcheckpoints)) {
+						if (count($acheckpoints) === 0 || count($bcheckpoints) === 0) return 0;
+						array_pop($acheckpoints);
+						array_pop($bcheckpoints);
+					}
+					return end($acheckpoints) - end($bcheckpoints);
+				}
+				return $a->getPrevRaceTime() - $b->getPrevRaceTime();
+			});
+
+			$players = [];
+			$rank = 1;
+			foreach ($this->spawnedPlayersTime as $playerscore) {
+				/** @var \ManiaControl\Callbacks\Structures\TrackMania\Models\PlayerScore $playerscore */
+				if ($playerscore->getPlayer()->isSpectator) continue;
+
+				$players[] = [
+					"ubisoftUid" => $playerscore->getPlayer()->getAccountId(),
+					"finishTime" => $playerscore->getPrevRaceTime(),
+					"position" => $rank
+				];
+				$rank++;
+			}
+
+			$mapuid = "";
+			$map = $this->maniaControl->getMapManager()->getCurrentMap();
+			if ($map !== null) {
+				$mapuid = $map->uid;
+			}
+
+			$payload = json_encode([
+				"players" => $players,
+				"mapId" => $mapuid
+			]);
+
+			$request = $this->getAPIRequest("/match-addRound");
+			if ($request !== null) {
+				$this->log("Starting 'addRound' request with '". $payload ."'");
+				$request->setContent($payload)->setCallable(function ($content, $error, $headers) use ($payload) {
+					if ($content !== "Created" || $error !== null) {
+						$this->logError("Error on the 'addRound' request. answer: " . $content . " / error: " . $error . " / payload: " . $payload);
+					}
+				})->postData();
+			}
+		} else {
+			$this->log("Round isn't valid, no data sent.");
+			$this->spawnedPlayersTime = [];
 		}
 	}
 
