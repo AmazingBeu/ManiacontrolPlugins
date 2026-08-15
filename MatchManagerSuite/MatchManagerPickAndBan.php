@@ -31,7 +31,7 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 223;
-	const PLUGIN_VERSION									= 0.1;
+	const PLUGIN_VERSION									= 0.2;
 	const PLUGIN_NAME										= 'MatchManager Pick & Ban';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -478,6 +478,7 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 			<frameinstance modelid="framemodel-map" hidden="1"/>
 			<frameinstance modelid="framemodel-map" hidden="1"/>
 		</frame>
+		<label id="label-current-action" class="text" pos="116 -68" size="200 8" halign="center" textsize="5" text=""/>
 		<label id="label-timer" class="text" pos="116 -77" halign="center" textsize="8" text=""/>
 		<quad pos="116 -88" size="232 2" halign="center" bgcolor="ffffff" opacity="0.4"/>
 		<quad id="quad-timer" pos="116 -88" size="0 2" halign="center" bgcolor="ffffff"/>
@@ -543,6 +544,7 @@ main() {
 	declare CMlFrame Frame_Maps <=> (Frame_Global.GetFirstChild("frame-maps") as CMlFrame);
 	declare CMlFrame Frame_Steps <=> (Frame_Global.GetFirstChild("frame-steps") as CMlFrame);
 	declare CMlLabel Label_Timer <=> (Frame_Global.GetFirstChild("label-timer") as CMlLabel);
+	declare CMlLabel Label_CurrentAction <=> (Frame_Global.GetFirstChild("label-current-action") as CMlLabel);
 	declare CMlQuad Quad_Timer <=> (Frame_Global.GetFirstChild("quad-timer") as CMlQuad);
 
 	wait(InputPlayer != Null);
@@ -655,6 +657,9 @@ main() {
 							} else {
 								Label_Step.Value = "Random pick";
 							}
+							if (MatchManagerPickAndBan_State.stepIndex == Index) {
+								Label_CurrentAction.Value = "";
+							}
 						} else if (Step.type == C_StepType_Ban) {
 							declare Text DisplayName = UserStore::GetUserMgrPlayerName(Step.login);
 							if (DisplayName == "") {
@@ -662,8 +667,19 @@ main() {
 								if (!PendingAccountIds.exists(Step.login)) {
 									PendingAccountIds.add(Step.login);
 								}
+								if (MatchManagerPickAndBan_State.stepIndex == Index) {
+									Label_CurrentAction.Value = "";
+								}
 							} else {
-								Label_Step.Value = "Ban by "^ DisplayName; 
+								Label_Step.Value = "Ban by "^ DisplayName;
+								if (MatchManagerPickAndBan_State.stepIndex == Index) {
+									if (Step.login == InputPlayer.User.Login) {
+										Label_CurrentAction.Value = "You have to ban a map";
+										System.FlashWindow();
+									} else {
+										Label_CurrentAction.Value = DisplayName ^" has to ban a map";
+									}
+								}
 							}
 						} else {
 							declare Text DisplayName = UserStore::GetUserMgrPlayerName(Step.login);
@@ -672,10 +688,23 @@ main() {
 								if (!PendingAccountIds.exists(Step.login)) {
 									PendingAccountIds.add(Step.login);
 								}
+								if (MatchManagerPickAndBan_State.stepIndex == Index) {
+									Label_CurrentAction.Value = "";
+								}
 							} else {
 								Label_Step.Value = "Pick by "^ DisplayName;
+								if (MatchManagerPickAndBan_State.stepIndex == Index) {
+									if (Step.login == InputPlayer.User.Login) {
+										Label_CurrentAction.Value = "You have to pick a map";
+										System.FlashWindow();
+									} else {
+										Label_CurrentAction.Value = DisplayName ^" has to pick a map";
+									}
+								}
 							}
 						}
+						log(Label_CurrentAction.Value );
+						log(MatchManagerPickAndBan_State.stepIndex ^"=="^ Index);
 					} else {
 						Frame_MapName.Visible = True;
 						Label_Step.RelativePosition_V3.Y = -2.3;
@@ -719,9 +748,14 @@ main() {
 							}
 							Quad_MapThumbnail.Colorize = C_Color_Reset;
 						}
+
+						if (MatchManagerPickAndBan_State.stepIndex == Index || MatchManagerPickAndBan_State.stepIndex >= StepsCount) {
+							Label_CurrentAction.Value = "";
+						}
 					}
 
 					Tools::FitLabelValue(Label_Step, 3., 1., 0.25);
+					Tools::FitLabelValue(Label_CurrentAction, 5., 3., 0.25);
 					Index += 1;
 				}
 				while (Frame_Steps.Controls.existskey(Index)) {
