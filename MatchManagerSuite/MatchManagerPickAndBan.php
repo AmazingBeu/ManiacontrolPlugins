@@ -505,6 +505,7 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 #Include "TextLib" as TL
 #Include "TimeLib" as TiL
 
+#Include "Libs/Nadeo/CMGame/Utils/Task@2.Script.txt" as Task
 #Include "Libs/Nadeo/CMGame/Utils/Tools.Script.txt" as Tools
 #Include "Libs/Nadeo/Trackmania/Stores/UserStore_ML.Script.txt" as UserStore
 
@@ -517,6 +518,9 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 #Const C_Color_White <1., 1., 1.>
 #Const C_Color_Gray <.7, .7, .7>
 #Const C_Color_Reset <-1., -1., -1.>
+
+#Const C_CooldownDuration 1000
+#Const C_MaxAccountIdsPerTask 150 //< Asking for more at one time will create an http error 414 URI Too Long
 
 '. $this->getManialinkStructures() . '
 
@@ -547,13 +551,26 @@ main() {
 	declare Integer MatchManagerPickAndBan_State_Serial for This;
 	declare Integer Last_State_Serial = -1;
 
-	declare Integer Last_Timer_Update ;
+	declare Integer Last_Timer_Update;
+
+	declare Task::K_Task Task_RetrievingName;
+	declare Integer Cooldown;
+	declare Text[] PendingAccountIds;
+	declare Text[] RequestingAccountIds;
+
+	declare Boolean UpdateNow;
 
 	while(True) {
 		yield;
+
 		if (Last_State_Serial != MatchManagerPickAndBan_State_Serial) {
 			Last_State_Serial = MatchManagerPickAndBan_State_Serial;
-			log("New state " ^ MatchManagerPickAndBan_State);
+			UpdateNow = True;
+		}
+
+		if (UpdateNow) {
+			UpdateNow = False;
+			log("Updating interface");
 
 			Frame_Global.Visible = (MatchManagerPickAndBan_State.status == C_Status_InProgress);
 			if (Frame_Global.Visible) {
@@ -639,9 +656,25 @@ main() {
 								Label_Step.Value = "Random pick";
 							}
 						} else if (Step.type == C_StepType_Ban) {
-							Label_Step.Value = "Ban by "^ UserStore::GetUserMgrPlayerName(Step.login);
+							declare Text DisplayName = UserStore::GetUserMgrPlayerName(Step.login);
+							if (DisplayName == "") {
+								Label_Step.Value = "Ban by "^ Step.login;
+								if (!PendingAccountIds.exists(Step.login)) {
+									PendingAccountIds.add(Step.login);
+								}
+							} else {
+								Label_Step.Value = "Ban by "^ DisplayName; 
+							}
 						} else {
-							Label_Step.Value = "Pick by "^ UserStore::GetUserMgrPlayerName(Step.login);
+							declare Text DisplayName = UserStore::GetUserMgrPlayerName(Step.login);
+							if (DisplayName == "") {
+								Label_Step.Value = "Pick by "^ Step.login;
+								if (!PendingAccountIds.exists(Step.login)) {
+									PendingAccountIds.add(Step.login);
+								}
+							} else {
+								Label_Step.Value = "Pick by "^ DisplayName;
+							}
 						}
 					} else {
 						Frame_MapName.Visible = True;
@@ -664,10 +697,26 @@ main() {
 								Quad_MapThumbnail.Colorize = C_Color_Reset;
 							}
 						} else if (Step.type == C_StepType_Ban) {
-							Label_Step.Value = "Banned by "^ UserStore::GetUserMgrPlayerName(Step.login);
+							declare Text DisplayName = UserStore::GetUserMgrPlayerName(Step.login);
+							if (DisplayName == "") {
+								Label_Step.Value = "Ban by "^ Step.login;
+								if (!PendingAccountIds.exists(Step.login)) {
+									PendingAccountIds.add(Step.login);
+								}
+							} else {
+								Label_Step.Value = "Ban by "^ DisplayName; 
+							}
 							Quad_MapThumbnail.Colorize = C_Color_White;
 						} else {
-							Label_Step.Value = "Picked by "^ UserStore::GetUserMgrPlayerName(Step.login);
+							declare Text DisplayName = UserStore::GetUserMgrPlayerName(Step.login);
+							if (DisplayName == "") {
+								Label_Step.Value = "Pick by "^ Step.login;
+								if (!PendingAccountIds.exists(Step.login)) {
+									PendingAccountIds.add(Step.login);
+								}
+							} else {
+								Label_Step.Value = "Pick by "^ DisplayName;
+							}
 							Quad_MapThumbnail.Colorize = C_Color_Reset;
 						}
 					}
@@ -717,6 +766,27 @@ main() {
 				AnimMgr.Flush(Quad_Timer);
 				AnimMgr.Add(Quad_Timer, "<a	size=\"0 2\"/>", 100, CAnimManager::EAnimManagerEasing::Linear);
 			}
+		}
+
+		if (Task::IsProcessing(Task_RetrievingName)) {
+			Task_RetrievingName = Task::Update(UserMgr, UserMgr, Task_RetrievingName);
+
+			if (!Task::IsProcessing(Task_RetrievingName)) {
+				log("Ending RetrieveNames Task_RetrievingName for: "^ RequestingAccountIds);
+				Task_RetrievingName = Task::Destroy(UserMgr, UserMgr, Task_RetrievingName);
+
+				UpdateNow = True;
+			}
+		} else if (PendingAccountIds.count > 0 && Cooldown <= Now) {
+			RequestingAccountIds = PendingAccountIds.slice(0, C_MaxAccountIdsPerTask);
+			PendingAccountIds = PendingAccountIds.slice(C_MaxAccountIdsPerTask);
+			Task_RetrievingName = Task::DestroyAndCreate(
+				UserMgr,
+				UserMgr,
+				Task_RetrievingName,
+				UserMgr.RetrieveDisplayName(UserMgr.MainUser.Id, RequestingAccountIds)
+			);
+			log("Starting RetrieveNames Task_RetrievingName for: "^ RequestingAccountIds);
 		}
 
 	}
