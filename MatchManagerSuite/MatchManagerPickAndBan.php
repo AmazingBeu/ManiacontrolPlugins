@@ -460,7 +460,7 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 		<label id="label-step" class="text" pos="0 -2.3" size="75 8" halign="center" valign="center" textsize="3" textprefix="$t$s" text="Banned By CARLJR."/>
 	</frame>
 </framemodel>
-<frame id="frame-global" hidden="1">
+<frame id="frame-global" hidden="1" z-index="5000">
 	<quad size="320 180" fullscreen="1" halign="center" valign="center" image="file://Media/Manialinks/Nadeo/Trackmania/Menus/PageProfile/UI_profile_background_map_gradients.dds"/>
 	<frame pos="-160 0">
 		<label class="text" pos="116 80" halign="center"  textsize="10" text="Pick & Ban"/>
