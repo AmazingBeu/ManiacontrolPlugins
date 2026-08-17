@@ -6,6 +6,7 @@ use Exception;
 use ManiaControl\Callbacks\CallbackListener;
 use ManiaControl\Callbacks\Callbacks;
 use ManiaControl\Callbacks\TimerListener;
+use ManiaControl\Files\AsyncHttpRequest;
 use ManiaControl\Logger;
 use ManiaControl\ManiaControl;
 use ManiaControl\Manialinks\ManialinkPageAnswerListener;
@@ -43,6 +44,8 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 	const SETTING_STEPDURATION 								= 'Step duration';
 	const SETTING_DURATIONAFTERTHELASTSTEP					= 'Duration after the last step';
 	const SETTING_STARTMATCHAUTOMATICALLY					= 'Start match automatically after the end of the pick & ban';
+	const SETTING_PRODUCTIONAPIURL							= 'Production API URL';
+
 
 	// Other MatchManager plugin
 	const MATCHMANAGERCORE_PLUGIN							= 'MatchManagerSuite\MatchManagerCore';
@@ -125,6 +128,7 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_STEPDURATION, 60, '',100);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_DURATIONAFTERTHELASTSTEP, 30, '', 150);
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_STARTMATCHAUTOMATICALLY, true, '', 150);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_PRODUCTIONAPIURL, '', '', 200);
 
 		// Callbacks
 		$this->maniaControl->getManialinkManager()->registerManialinkPageAnswerListener(self::ML_STEP_OPENSETTINGS, $this, 'handleStepOpenSettings');
@@ -238,6 +242,7 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 			$this->state->endTimestamp = time() + $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_STEPDURATION);
 		}
 
+		$this->sendStateToProduction();
 		$this->sendStateToPlayers();
 	}
 
@@ -863,6 +868,26 @@ main() {
 --></script>
 </manialink>';
 		$this->maniaControl->getManialinkManager()->sendManialink($manialink);
+	}
+
+	private function sendStateToProduction(): void {
+		$url = $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_PRODUCTIONAPIURL);
+		if ($url === '') return;
+
+		$this->log('Sending state to the API');
+
+		$asyncHttpRequest = new AsyncHttpRequest($this->maniaControl, $url);
+		$asyncHttpRequest->setContentType(AsyncHttpRequest::CONTENT_TYPE_JSON);
+		$asyncHttpRequest->setContent(json_encode($this->state));
+
+		$asyncHttpRequest->setCallable(function ($data, $error, $headers){
+			if ($error) {
+				Logger::logError('Error when sending state: '. $error);
+				return;
+			}
+			Logger::log('Succesfully sent the state to the Production API');
+		});
+		$asyncHttpRequest->postData();
 	}
 
 	private function clearManialinks() {
