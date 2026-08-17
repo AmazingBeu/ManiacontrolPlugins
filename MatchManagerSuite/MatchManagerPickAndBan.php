@@ -31,7 +31,7 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 223;
-	const PLUGIN_VERSION									= 0.2;
+	const PLUGIN_VERSION									= 0.3;
 	const PLUGIN_NAME										= 'MatchManager Pick & Ban';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -41,6 +41,8 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 	const SETTING_ENABLE									= 'Enable pick & ban';
 	const SETTING_STEPCONFIG 								= 'Step config';
 	const SETTING_STEPDURATION 								= 'Step duration';
+	const SETTING_DURATIONAFTERTHELASTSTEP					= 'Duration after the last step';
+	const SETTING_STARTMATCHAUTOMATICALLY					= 'Start match automatically after the end of the pick & ban';
 
 	// Other MatchManager plugin
 	const MATCHMANAGERCORE_PLUGIN							= 'MatchManagerSuite\MatchManagerCore';
@@ -119,8 +121,10 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 
 		// Settings
 		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_ENABLE, true, '', 0);
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_STEPCONFIG, '', '', 0);
-		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_STEPDURATION, 60, '', 0);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_STEPCONFIG, '', '', 100);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_STEPDURATION, 60, '',100);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_DURATIONAFTERTHELASTSTEP, 30, '', 150);
+		$this->maniaControl->getSettingManager()->initSetting($this, self::SETTING_STARTMATCHAUTOMATICALLY, true, '', 150);
 
 		// Callbacks
 		$this->maniaControl->getManialinkManager()->registerManialinkPageAnswerListener(self::ML_STEP_OPENSETTINGS, $this, 'handleStepOpenSettings');
@@ -228,7 +232,11 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 		}
 
 		$this->state->startTimestamp = time();
-		$this->state->endTimestamp = time() + $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_STEPDURATION);
+		if ($this->state->stepIndex >= count($this->state->steps)) {
+			$this->state->endTimestamp = time() + $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_DURATIONAFTERTHELASTSTEP);
+		} else {
+			$this->state->endTimestamp = time() + $this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_STEPDURATION);
+		}
 
 		$this->sendStateToPlayers();
 	}
@@ -248,10 +256,14 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 				$this->state->steps[$this->state->stepIndex]->login = "";
 				$this->manageStep();
 			} else {
-				$this->log("Start match");
+				$this->log("Pick & ban are over");
 				$this->state->status = MatchManagerPickAndBan_State::STATUS_COMPLETED;
-				$this->MatchManagerCore->MatchStart();
 				$this->clearManialinks();
+
+				if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_STARTMATCHAUTOMATICALLY)) {
+					$this->log("Automatically starting the match");
+					$this->MatchManagerCore->MatchStart();
+				}
 			}
 		}
 	}
