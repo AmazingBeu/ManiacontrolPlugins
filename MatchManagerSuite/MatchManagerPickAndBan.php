@@ -264,6 +264,7 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 				$this->log("Pick & ban are over");
 				$this->state->status = MatchManagerPickAndBan_State::STATUS_COMPLETED;
 				$this->clearManialinks();
+				$this->sendStateToProduction();
 
 				if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_STARTMATCHAUTOMATICALLY)) {
 					$this->log("Automatically starting the match");
