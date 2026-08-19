@@ -261,7 +261,30 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 				$this->state->steps[$this->state->stepIndex]->login = "";
 				$this->manageStep();
 			} else {
+				$this->maniaControl->getChat()->sendSuccess("Pick & ban are over");
 				$this->log("Pick & ban are over");
+
+				foreach ($this->state->steps as $step) {
+					$mapName = array_key_exists($step->mapUid, $this->state->maps) ? $this->state->maps[$step->mapUid]->name : $step->mapUid;
+					
+					if ($step->login === "") {
+						if ($step->type === MatchManagerPickAndBan_Step::STEP_PICK) {
+							$this->log('"' . $mapName . '" picked randomly');
+						} else if ($step->type === MatchManagerPickAndBan_Step::STEP_BAN) {
+							$this->log('"' . $mapName . '" banned randomly');
+						}
+					} else {
+						$player = $this->maniaControl->getPlayerManager()->getPlayer($step->login);
+						$name = $player !== null ? $player->nickname : $step->login;
+
+						if ($step->type === MatchManagerPickAndBan_Step::STEP_PICK) {
+							$this->log('"' . $mapName . '" picked by "' . $name . '"');
+						} else if ($step->type === MatchManagerPickAndBan_Step::STEP_BAN) {
+							$this->log('"' . $mapName . '" banned by "' . $name . '"');
+						}
+					}
+				}
+
 				$this->state->status = MatchManagerPickAndBan_State::STATUS_COMPLETED;
 				$this->clearManialinks();
 				$this->sendStateToProduction();
