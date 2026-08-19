@@ -831,7 +831,7 @@ main() {
 
 		if (Last_Timer_Update < Now) {
 			Last_Timer_Update = Now + 100;
-			if (MatchManagerPickAndBan_State.startTimestamp != 0 && MatchManagerPickAndBan_State.endTimestamp != 0) {
+			if (MatchManagerPickAndBan_State.startTimestamp != 0 && MatchManagerPickAndBan_State.endTimestamp != 0 && MatchManagerPickAndBan_State.startTimestamp != MatchManagerPickAndBan_State.endTimestamp) {
 				declare Integer RemainingTime = ML::Max(MatchManagerPickAndBan_State.endTimestamp - TL::ToInteger(TiL::GetCurrent()), 0);
 				Label_Timer.Value = ""^ RemainingTime;
 				declare Real Width = RemainingTime * 232. / (MatchManagerPickAndBan_State.endTimestamp - MatchManagerPickAndBan_State.startTimestamp);
