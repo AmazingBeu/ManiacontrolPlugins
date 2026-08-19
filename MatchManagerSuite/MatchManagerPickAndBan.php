@@ -4,6 +4,7 @@ namespace MatchManagerSuite;
 
 use Exception;
 use ManiaControl\Callbacks\CallbackListener;
+use ManiaControl\Callbacks\CallbackManager;
 use ManiaControl\Callbacks\Callbacks;
 use ManiaControl\Callbacks\TimerListener;
 use ManiaControl\Files\AsyncHttpRequest;
@@ -32,7 +33,7 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 	 * Constants
 	 */
 	const PLUGIN_ID											= 223;
-	const PLUGIN_VERSION									= 0.3;
+	const PLUGIN_VERSION									= 0.4;
 	const PLUGIN_NAME										= 'MatchManager Pick & Ban';
 	const PLUGIN_AUTHOR										= 'Beu';
 
@@ -52,8 +53,10 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 	const MATCHMANAGERADMINUI_PLUGIN						= 'MatchManagerSuite\MatchManagerAdminUI';
 
 	// Steps
-	const ML_STEP_OPENSETTINGS 							= 'MatchManagerSuite\MatchManagerPickAndBan.OpenSettings';
+	const ML_STEP_OPENSETTINGS 								= 'MatchManagerSuite\MatchManagerPickAndBan.OpenSettings';
 	const ML_STEP_MAPCHOOSENREGEX							= '/^MatchManagerPickAndBan_MapChoosen:.*/';
+
+	const CALLBACK_PICKANDBANINFO						= 'Trackmania.MatchManager.PickAndBanInfo';
 
 	/*
 	 * Private properties
@@ -63,7 +66,7 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 	private MatchManagerPickAndBan_State $state;
 
 	/**
-	 * @param \ManiaControl\ManiaControl $maniaControl
+	 * @param ManiaControl $maniaControl
 	 * @see \ManiaControl\Plugins\Plugin::prepare()
 	 */
 	public static function prepare(ManiaControl $maniaControl) {
@@ -105,7 +108,7 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 	}
 
 	/**
-	 * @param \ManiaControl\ManiaControl $maniaControl
+	 * @param ManiaControl $maniaControl
 	 * @return bool
 	 * @see \ManiaControl\Plugins\Plugin::load()
 	 */
@@ -135,6 +138,7 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 		$this->maniaControl->getManialinkManager()->registerManialinkPageAnswerRegexListener(self::ML_STEP_MAPCHOOSENREGEX, $this, 'handleStepMapChoosen');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(Callbacks::AFTERINIT, $this, 'handleAfterInit');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener(PluginManager::CB_PLUGIN_LOADED, $this, 'handlePluginLoaded');
+		$this->maniaControl->getCallbackManager()->registerCallbackListener(CallbackManager::CB_MP_BEGINMAP, $this, 'handleBeginMapCallback');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener($this->MatchManagerCore::CB_MATCHMANAGER_ENDMATCH, $this, 'handleEndMatch');
 		$this->maniaControl->getCallbackManager()->registerCallbackListener($this->MatchManagerCore::CB_MATCHMANAGER_STOPMATCH, $this, 'handleEndMatch');
 
@@ -142,7 +146,8 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 
 		$this->updateAdminUIMenuItems();
 
-		$this->sendStateToPlayers();		
+		$this->sendStateToPlayers();
+		return false;
 	}
 
 	/**
@@ -288,6 +293,7 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 				$this->state->status = MatchManagerPickAndBan_State::STATUS_COMPLETED;
 				$this->clearManialinks();
 				$this->sendStateToProduction();
+				$this->sendCallbackToServer();
 
 				if ($this->maniaControl->getSettingManager()->getSettingValue($this, self::SETTING_STARTMATCHAUTOMATICALLY)) {
 					$this->log("Automatically starting the match");
@@ -345,6 +351,10 @@ class MatchManagerPickAndBan implements ManialinkPageAnswerListener, CallbackLis
 		$this->manageStep();
 	}
 
+	public function handleBeginMapCallback() {
+		if ($this->state->status !== MatchManagerPickAndBan_State::STATUS_COMPLETED) return;
+		$this->sendCallbackToServer();
+	}
 	/**
 	 * handle MatchManagerCore Can Start Match callback
 	 */
@@ -906,12 +916,38 @@ main() {
 
 		$asyncHttpRequest->setCallable(function ($data, $error, $headers){
 			if ($error) {
-				Logger::logError('Error when sending state: '. $error);
+				$this->logError('Error when sending state: '. $error);
 				return;
 			}
-			Logger::log('Succesfully sent the state to the Production API');
+			$this->log('Succesfully sent the state to the Production API');
 		});
 		$asyncHttpRequest->postData();
+	}
+
+	private function sendCallbackToServer(): void {
+		$callbackPayload = [
+			"Picks" => [],
+			"Bans" => []
+		];
+
+		foreach ($this->state->steps as $step) {
+			if ($step->login === "") {
+				if ($step->type === MatchManagerPickAndBan_Step::STEP_PICK) {
+					$callbackPayload["Picks"][$step->mapUid] = "";
+				} else if ($step->type === MatchManagerPickAndBan_Step::STEP_BAN) {
+					$callbackPayload["Bans"][$step->mapUid] = "";
+				}
+			} else {
+				if ($step->type === MatchManagerPickAndBan_Step::STEP_PICK) {
+					$callbackPayload['Picks'][$step->mapUid] = $this->getAccountId($step->login);
+				} else if ($step->type === MatchManagerPickAndBan_Step::STEP_BAN) {
+					$callbackPayload['Bans'][$step->mapUid] = $this->getAccountId($step->login);
+				}
+			}
+		}
+
+		$this->log('Sending callback to the server');
+		$this->maniaControl->getClient()->triggerModeScriptEvent(self::CALLBACK_PICKANDBANINFO, [json_encode($callbackPayload)]);
 	}
 
 	private function clearManialinks() {
@@ -947,6 +983,17 @@ main() {
 
 	private static function getShortClassName(): string {
 		return (new \ReflectionClass(static::class))->getShortName();
+	}
+
+	private function getAccountId(string $login) {
+		if (strlen($login) !== 22) return $login;
+
+		$login = str_pad($login, 24, "=", STR_PAD_RIGHT);
+
+		$login = str_replace("_","/", str_replace("-","+", $login));
+		$login = base64_decode($login);
+
+		return vsprintf("%s%s-%s-%s-%s-%s%s%s", str_split(bin2hex($login), 4));
 	}
 }
 
